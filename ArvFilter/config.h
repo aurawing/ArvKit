@@ -43,3 +43,4 @@ VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);
+VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32]);

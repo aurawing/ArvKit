@@ -22,13 +22,14 @@ Environment:
 
 #include "config.h"
 
-#define MINI_PORT_NAME L"\\MiniPort"
+#define MINI_PORT_NAME L"\\ArvCommPort"
 
 NTKERNELAPI HANDLE PsGetProcessInheritedFromUniqueProcessId(IN PEPROCESS Process);
 
 typedef enum _OP_COMMAND {  //操作命令
 	SET_PROC,
 	SET_RULES,
+	GET_STAT,
 } OpCommand;
 
 typedef struct _OpSetProc { //操作数据
@@ -51,6 +52,12 @@ typedef struct _OpSetRules { //操作数据
 	POpRule *rules;
 	UINT		ruleLen;
 } OpSetRules, *POpSetRules;
+
+typedef struct _RepStat { //返回统计信息
+	BYTE SHA256[32];
+	LONG Pass;
+	LONG Block;
+} RepStat, *PRepStat;
 
 PFLT_PORT     gServerPort;//服务端口
 PFLT_PORT     gClientPort;//客户端口
@@ -902,6 +909,31 @@ MiniMessage(
 				ExReleaseResourceLite(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case GET_STAT:
+				ExAcquireResourceSharedLite(&HashResource, TRUE);
+				PRepStat pStats = (PRepStat)OutputBuffer;
+				PRuleEntry pRuleEntry = NULL;
+				PPathEntry pPathEntry = NULL;
+				PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+				UINT i = 0;
+				while (pListEntry != &filterConfig.Rules)
+				{
+					pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+					PLIST_ENTRY pListEntry2 = pRuleEntry->Dirs.Flink;
+					while (pListEntry2 != &pRuleEntry->Dirs)
+					{
+						pPathEntry = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
+						Sha256UnicodeString(&pPathEntry->Path, pStats[i].SHA256);
+						pStats[i].Pass = pPathEntry->stat.passCounter;
+						pStats[i].Block = pPathEntry->stat.blockCounter;
+						i++;
+						pListEntry2 = pListEntry2->Flink;
+					}
+					pListEntry = pListEntry->Flink;
+				}
+				ExReleaseResourceLite(&HashResource);
+				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat)*i;
 				break;
 			}
 		} except(EXCEPTION_EXECUTE_HANDLER) {

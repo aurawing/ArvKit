@@ -1,6 +1,7 @@
 #include <wdm.h>
 
 #include "config.h"
+#include "sha256.h"
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 {
@@ -152,4 +153,12 @@ VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag)
 			str->Length = str->MaximumLength = 0;
 		}
 	}
+}
+
+VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32])
+{
+	SHA256_CTX ctx;
+	sha256_init(&ctx);
+	sha256_update(&ctx, pUniStr->Buffer, pUniStr->Length);
+	sha256_final(&ctx, result);
 }

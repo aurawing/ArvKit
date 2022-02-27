@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.28307.1778
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArvFilter", "ArvFilter\ArvFilter.vcxproj", "{72FA845F-4A40-4E6C-9D73-ED7A98054FEC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArvCtl", "ArvCtl\ArvCtl.vcxproj", "{957354B2-D2FC-4F9A-83DC-59D68A779976}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -41,6 +43,18 @@ Global
 		{72FA845F-4A40-4E6C-9D73-ED7A98054FEC}.Release|x86.ActiveCfg = Release|Win32
 		{72FA845F-4A40-4E6C-9D73-ED7A98054FEC}.Release|x86.Build.0 = Release|Win32
 		{72FA845F-4A40-4E6C-9D73-ED7A98054FEC}.Release|x86.Deploy.0 = Release|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|ARM.ActiveCfg = Debug|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|x64.ActiveCfg = Debug|x64
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|x64.Build.0 = Debug|x64
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|x86.ActiveCfg = Debug|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Debug|x86.Build.0 = Debug|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|ARM.ActiveCfg = Release|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|ARM64.ActiveCfg = Release|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|x64.ActiveCfg = Release|x64
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|x64.Build.0 = Release|x64
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|x86.ActiveCfg = Release|Win32
+		{957354B2-D2FC-4F9A-83DC-59D68A779976}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
