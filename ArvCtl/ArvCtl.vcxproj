@@ -165,11 +165,13 @@
     <ClCompile Include="ArvCtl.cpp" />
     <ClCompile Include="cSJON.c" />
     <ClCompile Include="server.cpp" />
+    <ClCompile Include="sha256.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cJSON.h" />
     <ClInclude Include="server.h" />
+    <ClInclude Include="sha256.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

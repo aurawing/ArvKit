@@ -21,6 +21,7 @@ Environment:
 #include <stdlib.h>
 
 #include "config.h"
+#include "sha256.h"
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
 
@@ -31,6 +32,10 @@ typedef enum _OP_COMMAND {  //操作命令
 	SET_RULES,
 	GET_STAT,
 } OpCommand;
+
+typedef struct _OpGetStat { //获取统计信息
+	OpCommand command;
+} OpGetStat, *POpGetStat;
 
 typedef struct _OpSetProc { //操作数据
 	OpCommand command;
@@ -54,7 +59,7 @@ typedef struct _OpSetRules { //操作数据
 } OpSetRules, *POpSetRules;
 
 typedef struct _RepStat { //返回统计信息
-	BYTE SHA256[32];
+	BYTE SHA256[SHA256_BLOCK_SIZE];
 	LONG Pass;
 	LONG Block;
 } RepStat, *PRepStat;
@@ -874,7 +879,7 @@ MiniMessage(
 	UNREFERENCED_PARAMETER(ConnectionCookie);
 	UNREFERENCED_PARAMETER(OutputBufferSize);
 	if ((InputBuffer != NULL) &&
-		(InputBufferSize >= (FIELD_OFFSET(OpSetProc, command) +
+		(InputBufferSize >= (FIELD_OFFSET(OpGetStat, command) +
 			sizeof(OpCommand)))) {
 		//int level = KeGetCurrentIrql();
 		DbgPrint("[FsFilter:MiniMessage]received message\n");
@@ -882,7 +887,7 @@ MiniMessage(
 		OpSetRules *pOpSetRules = NULL;
 		OpCommand command;
 		try {
-			command = ((OpSetProc*)InputBuffer)->command;
+			command = ((POpGetStat)InputBuffer)->command;
 			switch (command)
 			{
 			case SET_PROC:

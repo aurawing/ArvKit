@@ -1,4 +1,43 @@
 #include "utils.h"
+#include "sha256.h"
+
+//HRESULT InitCommunicationPort(HANDLE *hPort)
+//{
+//	HRESULT hResult = FilterConnectCommunicationPort(MINI_PORT_NAME, 0, NULL, 0, NULL, hPort);
+//	if (IS_ERROR(hResult)) {
+//		OutputDebugString(L"FilterConnectCommunicationPort fail!\n");
+//		return hResult;
+//	}
+//	return S_OK;
+//}
+//
+//VOID CloseCommunicationPort(HANDLE port)
+//{
+//	if (port)
+//	{
+//		CloseHandle(port);
+//	}
+//}
+
+HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out DWORD *bytesReturned)
+{
+	HANDLE port = INVALID_HANDLE_VALUE;
+	HRESULT hResult = S_OK;
+	hResult = FilterConnectCommunicationPort(MINI_PORT_NAME, 0, NULL, 0, NULL, &port);
+	if (IS_ERROR(hResult)) {
+		OutputDebugString(L"FilterConnectCommunicationPort fail!\n");
+		return hResult;
+	}
+	OpGetStat command;
+	command.command = GET_STAT;
+	hResult = FilterSendMessage(port, &command, sizeof(command), OutBuffer, dwInBufferSize, bytesReturned);
+	if (IS_ERROR(hResult)) {
+		CloseHandle(port);
+		return hResult;
+	}
+	CloseHandle(port);
+	return hResult;
+}
 
 HRESULT SendToDriver(LPVOID lpInBuffer, DWORD dwInBufferSize)
 {
@@ -26,7 +65,7 @@ HRESULT SendToDriver(LPVOID lpInBuffer, DWORD dwInBufferSize)
 	return hResult;
 }
 
-int SendSetProcMessage(ULONG procID, UINT ruleID)
+HRESULT SendSetProcMessage(ULONG procID, UINT ruleID)
 {
 	HRESULT hResult = S_OK;
 	OpSetProc msg;
@@ -35,14 +74,10 @@ int SendSetProcMessage(ULONG procID, UINT ruleID)
 	msg.procID = procID;
 	msg.ruleID = ruleID;
 	hResult = SendToDriver(&msg.command, sizeof(msg));
-	if (hResult != S_OK)
-	{
-		return hResult;
-	}
-	return 0;
+	return hResult;
 }
 
-int SendSetRulesMessage(POpRule *rules, UINT len)
+HRESULT SendSetRulesMessage(POpRule *rules, UINT len)
 {
 	HRESULT hResult = S_OK;
 	OpSetRules msg;
@@ -51,11 +86,7 @@ int SendSetRulesMessage(POpRule *rules, UINT len)
 	msg.rules = rules;
 	msg.ruleLen = len;
 	hResult = SendToDriver(&msg.command, sizeof(msg));
-	if (hResult != S_OK)
-	{
-		return hResult;
-	}
-	return 0;
+	return hResult;
 }
 
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
@@ -73,4 +104,13 @@ BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 	MultiByteToWideChar(CP_UTF8, 0, UTF8, -1, pwText, dwUnicodeLen);
 	*strUnicode = pwText;
 	return TRUE;
+}
+
+VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE])
+{
+	SHA256_CTX ctx;
+	size_t len = wcslen(pWStr);
+	sha256_init(&ctx);
+	sha256_update(&ctx, (BYTE*)pWStr, len*sizeof(wchar_t));
+	sha256_final(&ctx, result);
 }

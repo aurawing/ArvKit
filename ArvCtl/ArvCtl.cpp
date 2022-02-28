@@ -16,9 +16,22 @@
 #define FLT_SVC_NAME L"ArvFilter"
 #define LOGFILE "D:\\arv\\arvlog.txt"
 
+typedef struct _PathShaMap {
+	BYTE sha256[SHA256_BLOCK_SIZE];
+	PSTR path;
+} PathShaMap, *PPathShaMap;
+
 SERVICE_STATUS          gSvcStatus;
 SERVICE_STATUS_HANDLE   gSvcStatusHandle;
 HANDLE                  ghSvcStopEvent = NULL;
+//HANDLE					port = INVALID_HANDLE_VALUE;
+FILE* logfile;
+
+POpRule *pzpRules = NULL;
+PPathShaMap pathMap = NULL;
+int ruleSize = 0;
+int pathSize = 0;
+
 
 VOID SvcInstall(void);
 VOID WINAPI SvcCtrlHandler(DWORD);
@@ -160,6 +173,12 @@ VOID SvcInstall()
 VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 {
 	// Register the handler function for the service
+	fopen_s(&logfile, LOGFILE, "a+");
+	if (logfile == NULL)
+	{
+		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
 
 	gSvcStatusHandle = RegisterServiceCtrlHandler(
 		SVC_NAME,
@@ -223,13 +242,18 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
-
 	BOOL bSucc = RestartArvFilter();
 	if (!bSucc)
 	{
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
+	/*HRESULT result = InitCommunicationPort(&port);
+	if (result != S_OK)
+	{
+		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}*/
 	bSucc = ConfigArvFilter();
 	if (!bSucc)
 	{
@@ -237,6 +261,29 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 		return;
 	}
 
+	LPVOID buffer = (LPVOID)malloc(sizeof(RepStat)*pathSize);
+	DWORD bytesReturn = 0;
+	HRESULT result = GetStatistics(buffer, sizeof(RepStat)*pathSize, &bytesReturn);
+	if (result != S_OK)
+	{
+		free(buffer);
+		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
+	int lenRet = bytesReturn / sizeof(RepStat);
+	PRepStat retVal = (PRepStat)buffer;
+	for (int i = 0; i < lenRet; i++)
+	{
+		for (int j = 0; j < pathSize; j++) {
+			if (memcmp(pathMap[j].sha256, retVal[i].SHA256, SHA256_BLOCK_SIZE) == 0)
+			{
+				char logStr[100] = { 0 };
+				sprintf_s(logStr, 100, "find path %s: %d/%d", pathMap[j].path, retVal[i].Pass, retVal[i].Block);
+				WriteToLog(logStr);
+				break;
+			}
+		}
+	}
 	// Report running status when initialization is complete.
 
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
@@ -331,11 +378,12 @@ VOID WINAPI SvcCtrlHandler(DWORD dwCtrl)
 	case SERVICE_CONTROL_STOP:
 		ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
 		StopArvCtlServer();
+		//CloseCommunicationPort(port);
 		// Signal the service to stop.
 
 		SetEvent(ghSvcStopEvent);
 		ReportSvcStatus(gSvcStatus.dwCurrentState, NO_ERROR, 0);
-
+		fclose(logfile);
 		return;
 	case SERVICE_CONTROL_PAUSE:
 		break;
@@ -397,7 +445,7 @@ VOID SvcReportEvent(LPTSTR szFunction)
 */
 BOOL RestartArvFilter()
 {
-	
+
 	SC_HANDLE hSCM = NULL;
 	SC_HANDLE hSer = NULL;
 	SERVICE_STATUS serStatus = { 0 };
@@ -493,13 +541,23 @@ BOOL ConfigArvFilter()
 		WriteToLog((char*)"failed to parse config.json!");
 		return FALSE;
 	}
-	int ruleSize = cJSON_GetArraySize(jsonHead);
-	//printf("配置文件中共有%d条规则\n", ruleSize);
-	POpRule *pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
+	ruleSize = cJSON_GetArraySize(jsonHead);
 	cJSON *pJsonRule;
 	cJSON *pJsonRuleItem;
 	cJSON *pJsonPath;
 	POpRule pRule;
+	for (int i = 0; i < ruleSize; i++)
+	{
+		pJsonRule = cJSON_GetArrayItem(jsonHead, i);
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "Paths");
+		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
+		pathSize += pathLen;
+	}
+
+	//printf("配置文件中共有%d条规则\n", ruleSize);
+	pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
+	pathMap = (PPathShaMap)malloc(pathSize * sizeof(PathShaMap));
+	int k = 0;
 	for (int i = 0; i < ruleSize; i++)
 	{
 		pRule = (POpRule)malloc(sizeof(OpRule));
@@ -516,6 +574,9 @@ BOOL ConfigArvFilter()
 		{
 			pJsonPath = cJSON_GetArrayItem(pJsonRuleItem, j);
 			UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
+			Sha256UnicodeString(pRule->paths[j], pathMap[k].sha256);
+			pathMap[k].path = pJsonPath->valuestring;
+			k++;
 		}
 		pzpRules[i] = pRule;
 		/*printf("Rule %d:\n", i + 1);
@@ -527,7 +588,7 @@ BOOL ConfigArvFilter()
 		}
 		printf("\n");*/
 	}
-	if (SendSetRulesMessage(pzpRules, ruleSize) != 0)
+	if (SendSetRulesMessage(pzpRules, ruleSize) != S_OK)
 	{
 		WriteToLog((char*)"failed to config ArvFilter!");
 		return FALSE;
@@ -548,19 +609,19 @@ int WriteToLog(char* str)
 	SYSTEMTIME sysTime;
 	GetLocalTime(&sysTime);
 
-	char logStr[100] = { 0 };
-	sprintf_s(logStr, 100, "%04d-%02d-%02d %02d:%02d:%02d : %s", sysTime.wYear, sysTime.wMonth, sysTime.wDay,
+	char logStr[200] = { 0 };
+	sprintf_s(logStr, 200, "%04d-%02d-%02d %02d:%02d:%02d : %s", sysTime.wYear, sysTime.wMonth, sysTime.wDay,
 		sysTime.wHour, sysTime.wMinute, sysTime.wSecond, str);
 
-	FILE* logfile;
+	/*FILE* logfile;
 	fopen_s(&logfile, LOGFILE, "a+");
 
 	if (logfile == NULL)
 	{
 		return -1;
-	}
+	}*/
 
 	fprintf(logfile, "%s\n", logStr);
-	fclose(logfile);
+	//fclose(logfile);
 	return 0;
 }
