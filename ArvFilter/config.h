@@ -4,8 +4,8 @@
 #include <ntstrsafe.h>
 
 typedef struct _PathStat {
-	volatile long passCounter;
-	volatile long blockCounter;
+	volatile ULONGLONG passCounter;
+	volatile ULONGLONG blockCounter;
 
 } PathStat, *PPathStat;
 
@@ -33,13 +33,16 @@ typedef struct _RuleEntry {
 //π˝¬ÀπÊ‘Ú
 typedef struct _FilterConfig {
 	LIST_ENTRY Rules;
+	volatile ULONGLONG readCount;
+	volatile ULONGLONG writeCount;
 } FilterConfig, *PFilterConfig;
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
-VOID ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen);
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen);
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
+VOID ArvFreeRule(PRuleEntry pRuleEntry);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);

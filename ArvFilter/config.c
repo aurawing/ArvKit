@@ -8,13 +8,13 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 	InitializeListHead(&pFilterConfig->Rules);
 }
 
-VOID ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen)
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen)
 {
-	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(RuleEntry), 'RLE');
+	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(PagedPool, sizeof(RuleEntry), 'RLE');
 	RtlZeroMemory(pRuleEntry, sizeof(RuleEntry));
 	pRuleEntry->ID = id;
 	size_t pubKeyLen = wcslen(pubKey);
-	pRuleEntry->PubKey.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, pubKeyLen * sizeof(wchar_t), 'RLE');
+	pRuleEntry->PubKey.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, pubKeyLen * sizeof(wchar_t), 'RLE');
 	for (UINT i = 0; i < pubKeyLen; i++)
 	{
 		pRuleEntry->PubKey.Buffer[i] = pubKey[i];
@@ -25,9 +25,9 @@ VOID ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR path
 	{
 		PWSTR path = paths[j];
 		size_t pathLen = wcslen(path);
-		PPathEntry pPathEntry = (PPathEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(PathEntry), 'PTE');
+		PPathEntry pPathEntry = (PPathEntry)ExAllocatePoolWithTag(PagedPool, sizeof(PathEntry), 'PTE');
 		RtlZeroMemory(pPathEntry, sizeof(PathEntry));
-		pPathEntry->Path.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, pathLen * sizeof(wchar_t), 'PTE');
+		pPathEntry->Path.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, pathLen * sizeof(wchar_t), 'PTE');
 		for (UINT k = 0; k < pathLen; k++)
 		{
 			pPathEntry->Path.Buffer[k] = path[k];
@@ -37,6 +37,7 @@ VOID ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR path
 	}
 	InsertTailList(&pFilterConfig->Rules, &pRuleEntry->entry);
 	InitializeListHead(&pRuleEntry->Procs);
+	return pRuleEntry;
 }
 
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
@@ -58,7 +59,7 @@ BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
 				}
 				pListEntry2 = pListEntry2->Flink;
 			}
-			PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcEntry), 'FME');
+			PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'FME');
 			RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 			pProcEntry->ProcID = procID;
 			InsertTailList(&pRuleEntry->Procs, &pProcEntry->entry);
@@ -103,7 +104,8 @@ VOID ArvFreeRules(PFilterConfig pFilterConfig)
 	{
 		PLIST_ENTRY pDelRuleEntry = RemoveTailList(&pFilterConfig->Rules);
 		PRuleEntry pRuleEntry = CONTAINING_RECORD(pDelRuleEntry, RuleEntry, entry);
-		pRuleEntry->ID = 0;
+		ArvFreeRule(pRuleEntry);
+		/*pRuleEntry->ID = 0;
 		ArvFreeUnicodeString(&pRuleEntry->PubKey, 'RLE');
 		while (pRuleEntry->Dirs.Flink != &pRuleEntry->Dirs)
 		{
@@ -119,14 +121,35 @@ VOID ArvFreeRules(PFilterConfig pFilterConfig)
 			pProcEntry->ProcID = 0;
 			ExFreePoolWithTag(pProcEntry, 'FME');
 		}
-		ExFreePoolWithTag(pRuleEntry, 'RLE');
+		ExFreePoolWithTag(pRuleEntry, 'RLE');*/
 	}
 	InitializeListHead(&pFilterConfig->Rules);
 }
 
+VOID ArvFreeRule(PRuleEntry pRuleEntry)
+{
+	pRuleEntry->ID = 0;
+	ArvFreeUnicodeString(&pRuleEntry->PubKey, 'RLE');
+	while (pRuleEntry->Dirs.Flink != &pRuleEntry->Dirs)
+	{
+		PLIST_ENTRY pDelPathEntry = RemoveTailList(&pRuleEntry->Dirs);
+		PPathEntry pPathEntry = CONTAINING_RECORD(pDelPathEntry, PathEntry, entry);
+		ArvFreeUnicodeString(&pPathEntry->Path, 'PTE');
+		ExFreePoolWithTag(pPathEntry, 'PTE');
+	}
+	while (pRuleEntry->Procs.Flink != &pRuleEntry->Procs)
+	{
+		PLIST_ENTRY pDelProcEntry = RemoveTailList(&pRuleEntry->Procs);
+		PProcEntry pProcEntry = CONTAINING_RECORD(pDelProcEntry, ProcEntry, entry);
+		pProcEntry->ProcID = 0;
+		ExFreePoolWithTag(pProcEntry, 'FME');
+	}
+	ExFreePoolWithTag(pRuleEntry, 'RLE');
+}
+
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID)
 {
-	PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcEntry), 'RLE');
+	PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'RLE');
 	RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 	pProcEntry->ProcID = procID;
 	InsertTailList(pHead, &pProcEntry->entry);

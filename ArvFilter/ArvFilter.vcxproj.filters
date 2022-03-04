@@ -33,6 +33,9 @@
     <ClCompile Include="sha256.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="libsecp256k1\src\secp256k1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ArvFilter.rc">
@@ -44,6 +47,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sha256.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="random.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

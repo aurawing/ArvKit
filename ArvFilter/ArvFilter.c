@@ -19,9 +19,10 @@ Environment:
 #include <ntifs.h>
 #include <Wdmsec.h>
 #include <stdlib.h>
+#include <secp256k1.h>
 
+#include "random.h"
 #include "config.h"
-#include "sha256.h"
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
 
@@ -58,10 +59,19 @@ typedef struct _OpSetRules { //操作数据
 	UINT		ruleLen;
 } OpSetRules, *POpSetRules;
 
+//typedef struct _RepStat { //返回统计信息
+//	BYTE SHA256[SHA256_BLOCK_SIZE];
+//	LONG Pass;
+//	LONG Block;
+//} RepStat, *PRepStat;
+
 typedef struct _RepStat { //返回统计信息
-	BYTE SHA256[SHA256_BLOCK_SIZE];
-	LONG Pass;
-	LONG Block;
+	//BYTE SHA256[SHA256_BLOCK_SIZE];
+	ULONGLONG KeyCount;
+	ULONGLONG Pass;
+	ULONGLONG Block;
+	ULONGLONG Read;
+	ULONGLONG Write;
 } RepStat, *PRepStat;
 
 PFLT_PORT     gServerPort;//服务端口
@@ -453,6 +463,36 @@ VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
 	}
 }
 
+FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+	if (FltObjects->FileObject == NULL) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	InterlockedIncrement64(&filterConfig.readCount);
+	ExReleaseResourceLite(&HashResource);
+	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+	if (FltObjects->FileObject == NULL) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	InterlockedIncrement64(&filterConfig.writeCount);
+	ExReleaseResourceLite(&HashResource);
+	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -463,12 +503,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	// Pre-create callback to get file info during creation or opening
 	//
 	NTSTATUS status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	if (FltObjects->FileObject == NULL) {
+		return status;
+	}
 	PFLT_FILE_NAME_INFORMATION nameInfo;
 	UNICODE_STRING fullPath = { 0 };
 	UNICODE_STRING dosName = { 0 };
 	//HANDLE cProcessId = NULL;
 	//PEPROCESS cProcess = NULL;
-	UNREFERENCED_PARAMETER(FltObjects);
+	//UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
 	PAGED_CODE();
 	if (KeGetCurrentIrql() >= DISPATCH_LEVEL)
@@ -503,7 +546,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		(Data->Iopb->TargetFileObject->FileName.Buffer[fileNameLen / sizeof(wchar_t) - 1] == L'\\')
 		)
 	{
-		PWSTR logintag = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fileNameLen, 'LGI');
+		PWSTR logintag = (PWSTR)ExAllocatePoolWithTag(PagedPool, fileNameLen, 'LGI');
 		RtlZeroMemory(logintag, fileNameLen);
 		int b = 0;
 		PWSTR keyidstr = NULL;
@@ -556,7 +599,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		(Data->Iopb->TargetFileObject->FileName.Buffer[fileNameLen / sizeof(wchar_t) - 1] == L'\\')
 		)
 	{
-		PWSTR logouttag = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fileNameLen, 'LGO');
+		PWSTR logouttag = (PWSTR)ExAllocatePoolWithTag(PagedPool, fileNameLen, 'LGO');
 		RtlZeroMemory(logouttag, fileNameLen);
 		int b = 0;
 		PWSTR keyidstr = NULL;
@@ -595,7 +638,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExReleaseResourceLite(&HashResource);
 		return status;
 	}
-	ExReleaseResourceLite(&HashResource);
+	//ExReleaseResourceLite(&HashResource);
+	//ExAcquireResourceSharedLite(&HashResource, TRUE);
 	__try
 	{
 		status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &nameInfo);
@@ -612,7 +656,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				{
 					MyRtlVolumeDeviceToDosName(&(nameInfo->Volume), &dosName);
 					size_t fullLen = dosName.Length + Data->Iopb->TargetFileObject->FileName.Length;
-					fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
+					fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
 					fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
 					UINT i = 0, j = 0, k = 0;
 					for (i = 0; i < fullLen / sizeof(wchar_t); i++)
@@ -631,7 +675,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					BOOL flag = FALSE;
 					PRuleEntry pRuleEntry = { 0 };
 					PPathEntry pPathEntry = { 0 };
-					ExAcquireResourceSharedLite(&HashResource, TRUE);
+					//ExAcquireResourceSharedLite(&HashResource, TRUE);
 					PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
 					while (pListEntry != &filterConfig.Rules)
 					{
@@ -688,14 +732,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					out2:
 						if (!flag2)
 						{
-							InterlockedIncrement(&pPathEntry->stat.blockCounter);
+							InterlockedIncrement64(&pPathEntry->stat.blockCounter);
 							Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 							Data->IoStatus.Information = 0;
 							status = FLT_PREOP_COMPLETE;
 						}
 						else
 						{
-							InterlockedIncrement(&pPathEntry->stat.passCounter);
+							InterlockedIncrement64(&pPathEntry->stat.passCounter);
 						}
 						ArvFreeProcs(&procHead);
 					}
@@ -703,7 +747,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					{
 						DbgPrint("[FsFilter:create]no filter: %d - %wZ\n", FltGetRequestorProcessId(Data), fullPath);
 					}
-					ExReleaseResourceLite(&HashResource);
+					//ExReleaseResourceLite(&HashResource);
 				}
 				else
 				{
@@ -722,6 +766,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	{
 		DbgPrint("[FsFilter:create]PreOperationWrite EXCEPTION_EXECUTE_HANDLER: %wZ - %d\n", Data->Iopb->TargetFileObject->FileName, GetExceptionCode());
 	}
+	ExReleaseResourceLite(&HashResource);
 	ArvFreeUnicodeString(&dosName, 'SOD');
 	ArvFreeUnicodeString(&fullPath, 'POC');
 	if (status != FLT_PREOP_COMPLETE)
@@ -792,12 +837,18 @@ CONST FLT_OPERATION_REGISTRATION g_callbacks[] =
 		PreOperationCreate,
 		0
 	},
-	/*{
+	{
+		IRP_MJ_READ,
+		0,
+		PreOperationRead,
+		0
+	},
+	{
 		IRP_MJ_WRITE,
 		0,
 		PreOperationWrite,
 		0
-	},*/
+	},
 	{ IRP_MJ_OPERATION_END }
 };
 
@@ -901,16 +952,65 @@ MiniMessage(
 				break;
 			case SET_RULES:
 				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
-				if (filterConfig.Rules.Flink != &filterConfig.Rules)
+				/*if (filterConfig.Rules.Flink != &filterConfig.Rules)
 				{
+					ExReleaseResourceLite(&HashResource);
 					break;
-				}
+				}*/
+				FilterConfig tmpConfig = { 0 };
+				ArvInitializeFilterConfig(&tmpConfig);
+				tmpConfig.readCount = filterConfig.readCount;
+				tmpConfig.writeCount = filterConfig.writeCount;
 				pOpSetRules = (OpSetRules*)InputBuffer;
 				for (UINT i = 0; i < pOpSetRules->ruleLen; i++)
 				{
-					ArvAddRule(&filterConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->pathsLen);
+					PRuleEntry newRuleEntry = ArvAddRule(&tmpConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->pathsLen);
+					
+					PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+					while (pListEntry != &filterConfig.Rules)
+					{
+						PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+						if (pRuleEntry->ID == newRuleEntry->ID)
+						{
+							PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
+							while (pListEntry2 != &pRuleEntry->Procs)
+							{
+								PProcEntry ppe = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
+								ArvAddProc(&newRuleEntry->Procs, ppe->ProcID);
+								pListEntry2 = pListEntry2->Flink;
+							}
+
+							PLIST_ENTRY pListEntry3 = pRuleEntry->Dirs.Flink;
+							while (pListEntry3 != &pRuleEntry->Dirs)
+							{
+								PPathEntry pae = CONTAINING_RECORD(pListEntry3, PathEntry, entry);
+								
+								PLIST_ENTRY pListEntry4 = newRuleEntry->Dirs.Flink;
+								while (pListEntry4 != &newRuleEntry->Dirs)
+								{
+									PPathEntry pae2 = CONTAINING_RECORD(pListEntry4, PathEntry, entry);
+									if (RtlEqualUnicodeString(&pae->Path, &pae2->Path, FALSE))
+									{
+										pae2->stat = pae->stat;
+										break;
+									}
+									pListEntry4 = pListEntry4->Flink;
+								}
+								pListEntry3 = pListEntry3->Flink;
+							}
+							RemoveEntryList(pListEntry);
+							ArvFreeRule(pRuleEntry);
+							break;
+						}
+						pListEntry = pListEntry->Flink;
+					}
+
 					DbgPrint("[FsFilter:MiniMessage]add rule %d: %d - %ws - %d\n", i + 1, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->pathsLen);
 				}
+				ArvFreeRules(&filterConfig);
+				filterConfig = tmpConfig;
+				tmpConfig.Rules.Blink->Flink = &filterConfig.Rules;
+				tmpConfig.Rules.Flink->Blink = &filterConfig.Rules;
 				ExReleaseResourceLite(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
@@ -922,23 +1022,32 @@ MiniMessage(
 				PPathEntry pPathEntry = NULL;
 				PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
 				UINT i = 0;
+				ULONGLONG keyCount = 0;
+				ULONGLONG passTotal = 0;
+				ULONGLONG blockTotal = 0;
 				while (pListEntry != &filterConfig.Rules)
 				{
+					keyCount++;
 					pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
 					PLIST_ENTRY pListEntry2 = pRuleEntry->Dirs.Flink;
 					while (pListEntry2 != &pRuleEntry->Dirs)
 					{
 						pPathEntry = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
-						Sha256UnicodeString(&pPathEntry->Path, pStats[i].SHA256);
-						pStats[i].Pass = pPathEntry->stat.passCounter;
-						pStats[i].Block = pPathEntry->stat.blockCounter;
+						//Sha256UnicodeString(&pPathEntry->Path, pStats[i].SHA256);
+						passTotal += pPathEntry->stat.passCounter;
+						blockTotal += pPathEntry->stat.blockCounter;
 						i++;
 						pListEntry2 = pListEntry2->Flink;
 					}
 					pListEntry = pListEntry->Flink;
 				}
+				pStats->KeyCount = keyCount;
+				pStats->Block = blockTotal;
+				pStats->Pass = passTotal;
+				pStats->Read = filterConfig.readCount;
+				pStats->Write = filterConfig.writeCount;
 				ExReleaseResourceLite(&HashResource);
-				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat)*i;
+				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat);
 				break;
 			}
 		} except(EXCEPTION_EXECUTE_HANDLER) {
@@ -951,6 +1060,142 @@ MiniMessage(
 	return status;
 }
 
+int test()
+{
+	/* Instead of signing the message directly, we must sign a 32-byte hash.
+	 * Here the message is "Hello, world!" and the hash function was SHA-256.
+	 * An actual implementation should just call SHA-256, but this example
+	 * hardcodes the output to avoid depending on an additional library.
+	 * See https://bitcoin.stackexchange.com/questions/81115/if-someone-wanted-to-pretend-to-be-satoshi-by-posting-a-fake-signature-to-defrau/81116#81116 */
+	unsigned char msg_hash[32] = {
+		0x31, 0x5F, 0x5B, 0xDB, 0x76, 0xD0, 0x78, 0xC4,
+		0x3B, 0x8A, 0xC0, 0x06, 0x4E, 0x4A, 0x01, 0x64,
+		0x61, 0x2B, 0x1F, 0xCE, 0x77, 0xC8, 0x69, 0x34,
+		0x5B, 0xFC, 0x94, 0xC7, 0x58, 0x94, 0xED, 0xD3,
+	};
+	unsigned char seckey[32];
+	unsigned char randomize[32];
+	unsigned char compressed_pubkey[33];
+	unsigned char serialized_signature[64];
+	size_t len;
+	int is_signature_valid;
+	int return_val;
+	secp256k1_pubkey pubkey;
+	secp256k1_ecdsa_signature sig;
+	/* The specification in secp256k1.h states that `secp256k1_ec_pubkey_create` needs
+	 * a context object initialized for signing and `secp256k1_ecdsa_verify` needs
+	 * a context initialized for verification, which is why we create a context
+	 * for both signing and verification with the SECP256K1_CONTEXT_SIGN and
+	 * SECP256K1_CONTEXT_VERIFY flags. */
+	secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+	if (!fill_random(randomize, sizeof(randomize))) {
+		//printf("Failed to generate randomness\n");
+		return 1;
+	}
+	/* Randomizing the context is recommended to protect against side-channel
+	 * leakage See `secp256k1_context_randomize` in secp256k1.h for more
+	 * information about it. This should never fail. */
+	return_val = secp256k1_context_randomize(ctx, randomize);
+	if (!return_val)
+	{
+		return return_val;
+	}
+
+	/*** Key Generation ***/
+
+	/* If the secret key is zero or out of range (bigger than secp256k1's
+	 * order), we try to sample a new key. Note that the probability of this
+	 * happening is negligible. */
+	while (1) {
+		if (!fill_random(seckey, sizeof(seckey))) {
+			//printf("Failed to generate randomness\n");
+			return 1;
+		}
+		if (secp256k1_ec_seckey_verify(ctx, seckey)) {
+			break;
+		}
+	}
+
+	/* Public key creation using a valid context with a verified secret key should never fail */
+	return_val = secp256k1_ec_pubkey_create(ctx, &pubkey, seckey);
+	if (!return_val)
+	{
+		return return_val;
+	}
+
+	/* Serialize the pubkey in a compressed form(33 bytes). Should always return 1. */
+	len = sizeof(compressed_pubkey);
+	return_val = secp256k1_ec_pubkey_serialize(ctx, compressed_pubkey, &len, &pubkey, SECP256K1_EC_COMPRESSED);
+	if (!return_val)
+	{
+		return return_val;
+	}
+	/* Should be the same size as the size of the output, because we passed a 33 byte array. */
+	//assert(len == sizeof(compressed_pubkey));
+
+	/*** Signing ***/
+
+	/* Generate an ECDSA signature `noncefp` and `ndata` allows you to pass a
+	 * custom nonce function, passing `NULL` will use the RFC-6979 safe default.
+	 * Signing with a valid context, verified secret key
+	 * and the default nonce function should never fail. */
+	return_val = secp256k1_ecdsa_sign(ctx, &sig, msg_hash, seckey, NULL, NULL);
+	if (!return_val)
+	{
+		return return_val;
+	}
+
+	/* Serialize the signature in a compact form. Should always return 1
+	 * according to the documentation in secp256k1.h. */
+	return_val = secp256k1_ecdsa_signature_serialize_compact(ctx, serialized_signature, &sig);
+	if (!return_val)
+	{
+		return return_val;
+	}
+
+
+	/*** Verification ***/
+
+	/* Deserialize the signature. This will return 0 if the signature can't be parsed correctly. */
+	if (!secp256k1_ecdsa_signature_parse_compact(ctx, &sig, serialized_signature)) {
+		//printf("Failed parsing the signature\n");
+		return 1;
+	}
+
+	/* Deserialize the public key. This will return 0 if the public key can't be parsed correctly. */
+	if (!secp256k1_ec_pubkey_parse(ctx, &pubkey, compressed_pubkey, sizeof(compressed_pubkey))) {
+		//printf("Failed parsing the public key\n");
+		return 1;
+	}
+
+	/* Verify a signature. This will return 1 if it's valid and 0 if it's not. */
+	is_signature_valid = secp256k1_ecdsa_verify(ctx, &sig, msg_hash, &pubkey);
+
+	//printf("Is the signature valid? %s\n", is_signature_valid ? "true" : "false");
+	//printf("Secret Key: ");
+	//print_hex(seckey, sizeof(seckey));
+	//printf("Public Key: ");
+	//print_hex(compressed_pubkey, sizeof(compressed_pubkey));
+	//printf("Signature: ");
+	//print_hex(serialized_signature, sizeof(serialized_signature));
+
+
+	/* This will clear everything from the context and free the memory */
+	secp256k1_context_destroy(ctx);
+
+	/* It's best practice to try to clear secrets from memory after using them.
+	 * This is done because some bugs can allow an attacker to leak memory, for
+	 * example through "out of bounds" array access (see Heartbleed), Or the OS
+	 * swapping them to disk. Hence, we overwrite the secret key buffer with zeros.
+	 *
+	 * TODO: Prevent these writes from being optimized out, as any good compiler
+	 * will remove any writes that aren't used. */
+	memset(seckey, 0, sizeof(seckey));
+
+	return 0;
+
+}
+
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -959,6 +1204,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	UNICODE_STRING uniString;
 	DbgPrint("[FsFilter:register]registry path: %wZ\n", *RegistryPath);
 	__try {
+		//test();
 		ArvInitializeFilterConfig(&filterConfig);
 		ExInitializeResourceLite(&HashResource);
 		status = FltRegisterFilter(DriverObject, &g_filterRegistration, &g_minifilterHandle);

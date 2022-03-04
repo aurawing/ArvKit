@@ -30,6 +30,9 @@
     <ClCompile Include="sha256.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="config.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cJSON.h">
@@ -42,6 +45,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="sha256.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

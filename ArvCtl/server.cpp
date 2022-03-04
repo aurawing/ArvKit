@@ -28,63 +28,154 @@
 
 void process(WFHttpTask *server_task)
 {
-	protocol::HttpRequest *req = server_task->get_req();
-	protocol::HttpResponse *resp = server_task->get_resp();
-	long long seq = server_task->get_task_seq();
-	protocol::HttpHeaderCursor cursor(req);
-	std::string name;
-	std::string value;
-	char buf[8192];
-	int len;
-
-	/* Set response message body. */
-	resp->append_output_body_nocopy("<html>", 6);
-	len = snprintf(buf, 8192, "<p>%s %s %s</p>", req->get_method(),
-		req->get_request_uri(), req->get_http_version());
-	resp->append_output_body(buf, len);
-
-	while (cursor.next(name, value))
+	//user_req->get_request_uri()调用得到请求的完整URL，通过这个URL构建发往mysql的insert任务。
+	protocol::HttpRequest *user_req = server_task->get_req();
+	protocol::HttpResponse *user_resp = server_task->get_resp();
+	user_resp->set_header_pair("Content-Type", "application/json");
+	//调用 decode_chunked_body 方法解析 req 注意解析的是 body
+	std::string http_body = protocol::HttpUtil::decode_chunked_body(user_req);
+	std::string method;
+	user_req->get_method(method);
+	if (method != "POST")
 	{
-		len = snprintf(buf, 8192, "<p>%s: %s</p>", name.c_str(), value.c_str());
-		resp->append_output_body(buf, len);
+		user_resp->set_status_code("405");
+		user_resp->append_output_body("{\"code\": -1, \"msg\": \"only post method is allowed\", \"data\": {}}");
+		return;
 	}
-
-	resp->append_output_body_nocopy("</html>", 7);
-
-	/* Set status line if you like. */
-	resp->set_http_version("HTTP/1.1");
-	resp->set_status_code("200");
-	resp->set_reason_phrase("OK");
-
-	resp->add_header_pair("Content-Type", "text/html");
-	resp->add_header_pair("Server", "Sogou WFHttpServer");
-	if (seq == 9) /* no more than 10 requests on the same connection. */
-		resp->add_header_pair("Connection", "close");
-
-	/* print some log */
-	char addrstr[128];
-	struct sockaddr_storage addr;
-	socklen_t l = sizeof addr;
-	unsigned short port = 0;
-
-	server_task->get_peer_addr((struct sockaddr *)&addr, &l);
-	if (addr.ss_family == AF_INET)
-	{
-		struct sockaddr_in *sin = (struct sockaddr_in *)&addr;
-		inet_ntop(AF_INET, &sin->sin_addr, addrstr, 128);
-		port = ntohs(sin->sin_port);
+	if (http_body.empty()) {
+		user_resp->set_status_code("404");
+		user_resp->append_output_body("{\"code\": -1, \"msg\": \"no request data\", \"data\": {}}");
+		return;
 	}
-	else if (addr.ss_family == AF_INET6)
+	const char* jsonstr = http_body.c_str();
+	cJSON *jsonHead = cJSON_Parse(jsonstr);
+	if (jsonHead == NULL)
 	{
-		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&addr;
-		inet_ntop(AF_INET6, &sin6->sin6_addr, addrstr, 128);
-		port = ntohs(sin6->sin6_port);
+		user_resp->set_status_code("500");
+		user_resp->append_output_body("{\"code\": -1, \"msg\": \"parse json failed\", \"data\": {}}");
+		return;
+	}
+	cJSON *ifname = cJSON_GetObjectItem(jsonHead, "name");
+	if (ifname != NULL)
+	{
+		std::string ifnamestr(ifname->valuestring);
+		if (ifnamestr == "statinfo")
+		{
+			cJSON *iftime = cJSON_GetObjectItem(jsonHead, "time");
+			//ARV过滤器统计信息
+			RepStat kernelStat;
+			DWORD bytesReturn = 0;
+			HRESULT result = GetStatistics((PVOID)&kernelStat, sizeof(RepStat), &bytesReturn);
+			if (result != S_OK)
+			{
+				user_resp->append_output_body("{\"code\": -10, \"msg\": \"get statistics from kernel failed\", \"data\": {}}");
+				user_resp->set_status_code("500");
+			}
+			else
+			{
+				//磁盘统计信息查询
+				ArvDiskInfo diskInfo;
+				GetDiskInfo(&diskInfo);
+				cJSON *root = cJSON_CreateObject();
+				cJSON *item = cJSON_CreateObject();
+				cJSON_AddItemToObject(root, "code", cJSON_CreateNumber(0));
+				cJSON_AddItemToObject(root, "message", cJSON_CreateString("success"));
+				cJSON_AddItemToObject(root, "data", item);
+				cJSON_AddItemToObject(item, "secretnumber", cJSON_CreateNumber(kernelStat.KeyCount));
+				cJSON_AddItemToObject(item, "filesize", cJSON_CreateNumber(diskInfo.totalBytes - diskInfo.totalFreeBytes));
+				cJSON_AddItemToObject(item, "filenumber", cJSON_CreateNumber(0));
+				cJSON_AddItemToObject(item, "writenumber", cJSON_CreateNumber(kernelStat.Write));
+				cJSON_AddItemToObject(item, "readnumber", cJSON_CreateNumber(kernelStat.Read));
+				cJSON_AddItemToObject(item, "illegalaccess", cJSON_CreateNumber(kernelStat.Block));
+				char* jsonstr = cJSON_Print(root);
+				user_resp->append_output_body(jsonstr);
+				user_resp->set_status_code("200");
+				cJSON_Delete(root);
+			}
+		}
+		else if (ifnamestr == "saveconf")
+		{
+			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
+			int id = idEntry->valueint;
+			cJSON *pkEntry = cJSON_GetObjectItem(jsonHead, "pubkey");
+			PSTR pubkey = pkEntry->valuestring;
+			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
+			int pathLen = cJSON_GetArraySize(pathEntry);
+			if (id > 0 && pathLen > 0)
+			{
+				BOOL flag = TRUE;
+				PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
+				for (int i = 0; i < pathLen; i++)
+				{
+					cJSON *pJsonPath = cJSON_GetArrayItem(pathEntry, i);
+					if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+					{
+						flag = false;
+						break;
+					}
+					paths[i] = pJsonPath->valuestring;
+				}
+				if (flag)
+				{
+					UpdateConfig(id, pubkey, paths, pathLen);
+					free(paths);
+					user_resp->set_status_code("200");
+					char* jsonstr = PrintJsonConfig();
+					if (jsonstr != NULL)
+					{
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+						user_resp->append_output_body(jsonstr);
+						user_resp->append_output_body("}");
+						free(jsonstr);
+					}
+					else
+					{
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					}
+				}
+				else
+				{
+					free(paths);
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
+				}
+			}
+			else
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
+			}
+			
+		}
+		else if (ifnamestr == "getconf")
+		{
+			char* jsonstr = PrintJsonConfig();
+			if (jsonstr != NULL)
+			{
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+				user_resp->append_output_body(jsonstr);
+				user_resp->append_output_body("}");
+				free(jsonstr);
+			}
+			else
+			{
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+			}
+			user_resp->set_status_code("200");
+		}
+		else
+		{
+			user_resp->set_status_code("450");
+			user_resp->append_output_body("{\"code\": -30, \"msg\": \"no matched action\", \"data\": {}}");
+		}
 	}
 	else
-		strcpy_s(addrstr, "Unknown");
-
-	fprintf(stderr, "Peer address: %s:%d, seq: %lld.\n",
-		addrstr, port, seq);
+	{
+		user_resp->set_status_code("450");
+		user_resp->append_output_body("{\"code\": -1, \"msg\": \"request type not match\", \"data\": {}}");
+	}
+	cJSON_Delete(jsonHead);
+	return;
 }
 
 static WFHttpServer server(process);

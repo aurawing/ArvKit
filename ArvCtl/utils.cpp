@@ -1,5 +1,4 @@
 #include "utils.h"
-#include "sha256.h"
 
 //HRESULT InitCommunicationPort(HANDLE *hPort)
 //{
@@ -106,11 +105,48 @@ BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 	return TRUE;
 }
 
-VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE])
+VOID FreeRuleList(POpRule *pzpRules, int ruleSize)
 {
-	SHA256_CTX ctx;
-	size_t len = wcslen(pWStr);
-	sha256_init(&ctx);
-	sha256_update(&ctx, (BYTE*)pWStr, len*sizeof(wchar_t));
-	sha256_final(&ctx, result);
+	for (int i = 0; i < ruleSize; i++)
+	{
+		POpRule pOpRule = pzpRules[i];
+		pOpRule->id = 0;
+		free(pOpRule->pubKey);
+		for (int j = 0; j < pOpRule->pathsLen; j++)
+		{
+			free(pOpRule->paths[j]);
+			pOpRule->paths[j] = NULL;
+		}
+		pOpRule->pathsLen = 0;
+		free(pOpRule);
+		pOpRule = NULL;
+	}
+}
+
+//VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE])
+//{
+//	SHA256_CTX ctx;
+//	size_t len = wcslen(pWStr);
+//	sha256_init(&ctx);
+//	sha256_update(&ctx, (BYTE*)pWStr, len*sizeof(wchar_t));
+//	sha256_final(&ctx, result);
+//}
+
+void GetDiskInfo(PArvDiskInfo diskInfo)
+{
+	ULONGLONG totalBytes = 0, totalFreeBytes = 0;
+	ULARGE_INTEGER nFreeBytesAvailable, nTotalNumberOfBytes, nTotalNumberOfFreeBytes;
+	TCHAR buf[MAX_PATH] = { 0 };
+	GetLogicalDriveStrings(MAX_PATH, buf);
+	TCHAR*  pDrives = buf;
+	while (*pDrives != 0) {
+		if (GetDiskFreeSpaceEx(pDrives, &nFreeBytesAvailable, &nTotalNumberOfBytes, &nTotalNumberOfFreeBytes))
+		{
+			totalBytes += nTotalNumberOfBytes.QuadPart;
+			totalFreeBytes += nTotalNumberOfFreeBytes.QuadPart;
+		}
+		pDrives += wcslen(pDrives) + 1;
+	}
+	diskInfo->totalBytes = totalBytes;
+	diskInfo->totalFreeBytes = totalFreeBytes;
 }

@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <fltUser.h>
-#include "sha256.h"
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
 
@@ -37,10 +36,18 @@ typedef struct _OpSetRules { //操作数据
 } OpSetRules, *POpSetRules;
 
 typedef struct _RepStat { //返回统计信息
-	BYTE SHA256[SHA256_BLOCK_SIZE];
-	LONG Pass;
-	LONG Block;
+	//BYTE SHA256[SHA256_BLOCK_SIZE];
+	ULONGLONG KeyCount;
+	ULONGLONG Pass;
+	ULONGLONG Block;
+	ULONGLONG Read;
+	ULONGLONG Write;
 } RepStat, *PRepStat;
+
+typedef struct _ArvDiskInfo {
+	ULONGLONG totalBytes;
+	ULONGLONG totalFreeBytes;
+} ArvDiskInfo, *PArvDiskInfo;
 
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
@@ -48,4 +55,6 @@ HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
-VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);
+VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
+//VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);
+void GetDiskInfo(PArvDiskInfo diskInfo);

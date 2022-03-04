@@ -163,6 +163,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ArvCtl.cpp" />
+    <ClCompile Include="config.cpp" />
     <ClCompile Include="cSJON.c" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="sha256.cpp" />
@@ -170,6 +171,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cJSON.h" />
+    <ClInclude Include="config.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="sha256.h" />
     <ClInclude Include="utils.h" />

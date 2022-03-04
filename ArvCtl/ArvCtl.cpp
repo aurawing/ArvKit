@@ -4,6 +4,7 @@
 #include <locale.h>
 #include <strsafe.h>
 #include <tchar.h>
+#include "io.h"
 #include "server.h"
 #include "utils.h"
 #include"cJSON.h"
@@ -14,24 +15,12 @@
 #define SVC_NAME	TEXT("ArvCtl")
 #define SVC_ERROR	((DWORD)0xC0020001L)
 #define FLT_SVC_NAME L"ArvFilter"
-#define LOGFILE "D:\\arv\\arvlog.txt"
-
-typedef struct _PathShaMap {
-	BYTE sha256[SHA256_BLOCK_SIZE];
-	PSTR path;
-} PathShaMap, *PPathShaMap;
 
 SERVICE_STATUS          gSvcStatus;
 SERVICE_STATUS_HANDLE   gSvcStatusHandle;
 HANDLE                  ghSvcStopEvent = NULL;
-//HANDLE					port = INVALID_HANDLE_VALUE;
 FILE* logfile;
-
-POpRule *pzpRules = NULL;
-PPathShaMap pathMap = NULL;
-int ruleSize = 0;
-int pathSize = 0;
-
+TCHAR logPath[MAX_PATH];
 
 VOID SvcInstall(void);
 VOID WINAPI SvcCtrlHandler(DWORD);
@@ -40,6 +29,7 @@ VOID WINAPI SvcMain(DWORD, LPTSTR *);
 VOID ReportSvcStatus(DWORD, DWORD, DWORD);
 VOID SvcInit(DWORD, LPTSTR *);
 VOID SvcReportEvent(LPTSTR);
+BOOL StopArvFilter();
 BOOL RestartArvFilter();
 BOOL ConfigArvFilter();
 int WriteToLog(char*);
@@ -173,19 +163,41 @@ VOID SvcInstall()
 VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 {
 	// Register the handler function for the service
-	fopen_s(&logfile, LOGFILE, "a+");
+	GetModuleFileName(NULL, logPath, MAX_PATH);
+	WCHAR *ch = wcsrchr(logPath, '\\');
+	ch[1] = L'a';
+	ch[2] = L'r';
+	ch[3] = L'v';
+	ch[4] = L'c';
+	ch[5] = L't';
+	ch[6] = L'l';
+	ch[7] = L'.';
+	ch[8] = L'l';
+	ch[9] = L'o';
+	ch[10] = L'g';
+	ch[11] = L'\0';
+
+	_wfopen_s(&logfile, logPath, L"a+");
 	if (logfile == NULL)
 	{
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
-
+	if (InitConfig())
+	{
+		WriteToLog((char*)"in InitConfig(), parse config.json success!");
+	}
+	else
+	{
+		WriteToLog((char*)"in InitConfig(), parse config.json failed!");
+	}
 	gSvcStatusHandle = RegisterServiceCtrlHandler(
 		SVC_NAME,
 		SvcCtrlHandler);
 
 	if (!gSvcStatusHandle)
 	{
+		fclose(logfile);
 		SvcReportEvent((LPTSTR)TEXT("RegisterServiceCtrlHandler"));
 		return;
 	}
@@ -239,58 +251,34 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 
 	if (ghSvcStopEvent == NULL)
 	{
+		WriteToLog((char*)"in SvcInit(), creat event failed!");
+		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
-	BOOL bSucc = RestartArvFilter();
-	if (!bSucc)
+	if (!RestartArvFilter())
 	{
+		WriteToLog((char*)"in SvcInit(), restart ArvFilter failed!");
+		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
-	/*HRESULT result = InitCommunicationPort(&port);
-	if (result != S_OK)
+	if (!ConfigArvFilter())
 	{
+		WriteToLog((char*)"in SvcInit(), config ArvFilter failed!");
+		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
-	}*/
-	bSucc = ConfigArvFilter();
-	if (!bSucc)
-	{
-		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
-		return;
-	}
-
-	LPVOID buffer = (LPVOID)malloc(sizeof(RepStat)*pathSize);
-	DWORD bytesReturn = 0;
-	HRESULT result = GetStatistics(buffer, sizeof(RepStat)*pathSize, &bytesReturn);
-	if (result != S_OK)
-	{
-		free(buffer);
-		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
-		return;
-	}
-	int lenRet = bytesReturn / sizeof(RepStat);
-	PRepStat retVal = (PRepStat)buffer;
-	for (int i = 0; i < lenRet; i++)
-	{
-		for (int j = 0; j < pathSize; j++) {
-			if (memcmp(pathMap[j].sha256, retVal[i].SHA256, SHA256_BLOCK_SIZE) == 0)
-			{
-				char logStr[100] = { 0 };
-				sprintf_s(logStr, 100, "find path %s: %d/%d", pathMap[j].path, retVal[i].Pass, retVal[i].Block);
-				WriteToLog(logStr);
-				break;
-			}
-		}
 	}
 	// Report running status when initialization is complete.
 
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 
-	// TO_DO: Perform work until service stops.
+	// Perform work until service stops.
 	if (!StartArvCtlServer())
 	{
+		WriteToLog((char*)"in SvcInit(), start http server failed!");
+		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
@@ -299,7 +287,10 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 	{
 		// Check whether to stop the service.
 		WaitForSingleObject(ghSvcStopEvent, INFINITE);
-
+		StopArvCtlServer();
+		StopArvFilter();
+		ClearConfig();
+		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
@@ -377,13 +368,10 @@ VOID WINAPI SvcCtrlHandler(DWORD dwCtrl)
 	{
 	case SERVICE_CONTROL_STOP:
 		ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
-		StopArvCtlServer();
-		//CloseCommunicationPort(port);
 		// Signal the service to stop.
 
 		SetEvent(ghSvcStopEvent);
 		ReportSvcStatus(gSvcStatus.dwCurrentState, NO_ERROR, 0);
-		fclose(logfile);
 		return;
 	case SERVICE_CONTROL_PAUSE:
 		break;
@@ -437,6 +425,50 @@ VOID SvcReportEvent(LPTSTR szFunction)
 
 		DeregisterEventSource(hEventSource);
 	}
+}
+
+/**
+*   功能：
+*       关闭ArvFilter服务
+*/
+BOOL StopArvFilter()
+{
+	SC_HANDLE hSCM = NULL;
+	SC_HANDLE hSer = NULL;
+	SERVICE_STATUS serStatus = { 0 };
+	BOOL bSucc = FALSE;
+	hSCM = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+	if (hSCM == NULL)
+	{
+		WriteToLog((char*)"OpenSCManager failed!");
+		goto clean;
+	}
+	hSer = OpenService(hSCM, FLT_SVC_NAME, SERVICE_ALL_ACCESS);
+	if (hSer == NULL)
+	{
+		WriteToLog((char*)"OpenService failed!");
+		goto clean;
+	}
+	bSucc = ControlService(hSer, SERVICE_CONTROL_STOP, &serStatus);
+	if (bSucc)
+	{
+		WriteToLog((char*)"Stop ArvFilter success!");
+	}
+	else {
+		WriteToLog((char*)"Stop ArvFilter failed!");
+	}
+clean:
+	if (hSer != NULL)
+	{
+		CloseServiceHandle(hSer);
+	}
+	if (hSCM != NULL)
+	{
+		CloseServiceHandle(hSCM);
+	}
+	hSer = NULL;
+	hSCM = NULL;
+	return bSucc;
 }
 
 /**
@@ -497,106 +529,6 @@ clean:
 	hSCM = NULL;
 	hSer = NULL;
 	return TRUE;
-}
-
-BOOL ConfigArvFilter()
-{
-	errno_t err;
-	FILE *fp;
-	int file_size;
-	TCHAR drvFilePath[MAX_PATH];
-	GetModuleFileName(NULL, drvFilePath, MAX_PATH);
-	WCHAR *ch = wcsrchr(drvFilePath, '\\');
-	ch[1] = L'c';
-	ch[2] = L'o';
-	ch[3] = L'n';
-	ch[4] = L'f';
-	ch[5] = L'i';
-	ch[6] = L'g';
-	ch[7] = L'.';
-	ch[8] = L'j';
-	ch[9] = L's';
-	ch[10] = L'o';
-	ch[11] = L'n';
-	ch[12] = L'\0';
-	err = _wfopen_s(&fp, drvFilePath, L"rb");
-	if (err != 0)
-	{
-		WriteToLog((char*)"failed to open config.json!");
-		return FALSE;
-	}
-	fseek(fp, 0, SEEK_END);
-	file_size = ftell(fp);
-	char *tmp;
-	fseek(fp, 0, SEEK_SET);
-	size_t allocSize = file_size * sizeof(char) + sizeof(char);
-	tmp = (char *)malloc(allocSize);
-	memset(tmp, 0, allocSize);
-	fread(tmp, sizeof(char), file_size, fp);
-	fclose(fp);
-
-	cJSON *jsonHead = cJSON_Parse(tmp);
-	if (jsonHead == NULL)
-	{
-		WriteToLog((char*)"failed to parse config.json!");
-		return FALSE;
-	}
-	ruleSize = cJSON_GetArraySize(jsonHead);
-	cJSON *pJsonRule;
-	cJSON *pJsonRuleItem;
-	cJSON *pJsonPath;
-	POpRule pRule;
-	for (int i = 0; i < ruleSize; i++)
-	{
-		pJsonRule = cJSON_GetArrayItem(jsonHead, i);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "Paths");
-		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
-		pathSize += pathLen;
-	}
-
-	//printf("配置文件中共有%d条规则\n", ruleSize);
-	pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
-	pathMap = (PPathShaMap)malloc(pathSize * sizeof(PathShaMap));
-	int k = 0;
-	for (int i = 0; i < ruleSize; i++)
-	{
-		pRule = (POpRule)malloc(sizeof(OpRule));
-		pJsonRule = cJSON_GetArrayItem(jsonHead, i);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "ID");
-		pRule->id = pJsonRuleItem->valueint;
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "PublicKey");
-		UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "Paths");
-		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
-		pRule->pathsLen = pathLen;
-		pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
-		for (int j = 0; j < pathLen; j++)
-		{
-			pJsonPath = cJSON_GetArrayItem(pJsonRuleItem, j);
-			UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
-			Sha256UnicodeString(pRule->paths[j], pathMap[k].sha256);
-			pathMap[k].path = pJsonPath->valuestring;
-			k++;
-		}
-		pzpRules[i] = pRule;
-		/*printf("Rule %d:\n", i + 1);
-		printf("  id: %d\n", pRule->id);
-		printf("  public key: %ls\n", pRule->pubKey);
-		for (UINT j = 0; j < pRule->pathsLen; j++)
-		{
-			printf("  path %d: %ls\n", j + 1, pRule->paths[j]);
-		}
-		printf("\n");*/
-	}
-	if (SendSetRulesMessage(pzpRules, ruleSize) != S_OK)
-	{
-		WriteToLog((char*)"failed to config ArvFilter!");
-		return FALSE;
-	}
-	else
-	{
-		return TRUE;
-	}
 }
 
 /**
