@@ -33,7 +33,16 @@
     <ClCompile Include="sha256.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="libsecp256k1\src\precomputed_ecmult.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libsecp256k1\src\precomputed_ecmult_gen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="libsecp256k1\src\secp256k1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="crypto.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -49,7 +58,7 @@
     <ClInclude Include="sha256.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="random.h">
+    <ClInclude Include="crypto.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

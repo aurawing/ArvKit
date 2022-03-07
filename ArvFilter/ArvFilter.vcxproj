@@ -36,6 +36,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="config.c" />
+    <ClCompile Include="crypto.c" />
+    <ClCompile Include="libsecp256k1\src\precomputed_ecmult.c" />
+    <ClCompile Include="libsecp256k1\src\precomputed_ecmult_gen.c" />
     <ClCompile Include="libsecp256k1\src\secp256k1.c" />
     <ClCompile Include="sha256.c" />
     <ResourceCompile Include="ArvFilter.rc" />
@@ -157,23 +160,23 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
       <AdditionalDependencies>fltMgr.lib;Cng.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)\ArvFilter\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
       <TreatWarningAsError>false</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(SolutionDir)\ArvFilter\libsecp256k1\src;$(SolutionDir)\ArvFilter\libsecp256k1\include;$(VCToolsInstallDir)include;C:\Program Files (x86)\Windows Kits\10\Include\10.0.17763.0\ucrt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN64;_AMD64;AMD64;USE_FIELD_10X26;USE_SCALAR_8X32;USE_ENDOMORPHISM;USE_NUM_NONE;USE_FIELD_INV_BUILTIN;USE_SCALAR_INV_BUILTIN;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)\ArvFilter\libsecp256k1\src;$(SolutionDir)\ArvFilter\libsecp256k1\include;$(VCToolsInstallDir)include;$(UniversalCRT_IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ECMULT_GEN_PREC_BITS=4;ECMULT_WINDOW_SIZE=15;ENABLE_MODULE_ECDH=1;ENABLE_MODULE_RECOVERY=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
       <AdditionalDependencies>fltMgr.lib;Cng.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)\ArvFilter\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
       <TreatWarningAsError>false</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(SolutionDir)\ArvFilter\libsecp256k1\include;$(SolutionDir)\ArvFilter\libsecp256k1\src;$(VCToolsInstallDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN64;_AMD64;AMD64;USE_FIELD_10X26;USE_SCALAR_8X32;USE_ENDOMORPHISM;USE_NUM_NONE;USE_FIELD_INV_BUILTIN;USE_SCALAR_INV_BUILTIN;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)\ArvFilter\libsecp256k1\src;$(SolutionDir)\ArvFilter\libsecp256k1\include;$(VCToolsInstallDir)include;$(UniversalCRT_IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ECMULT_GEN_PREC_BITS=4;ECMULT_WINDOW_SIZE=15;ENABLE_MODULE_ECDH=1;ENABLE_MODULE_RECOVERY=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -201,7 +204,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h" />
-    <ClInclude Include="random.h" />
+    <ClInclude Include="crypto.h" />
     <ClInclude Include="sha256.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
