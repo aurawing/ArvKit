@@ -40,6 +40,21 @@ PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWST
 	return pRuleEntry;
 }
 
+PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
+	while (pListEntry != &pFilterConfig->Rules)
+	{
+		PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		if (pRuleEntry->ID == ruleID)
+		{
+			return &pRuleEntry->PubKey;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return NULL;
+}
+
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
@@ -184,4 +199,15 @@ VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32])
 	sha256_init(&ctx);
 	sha256_update(&ctx, pUniStr->Buffer, pUniStr->Length);
 	sha256_final(&ctx, result);
+}
+
+int ArvGetTime()
+{
+	LARGE_INTEGER GelinTime = { 0 };
+	LARGE_INTEGER LocalTime = { 0 };
+	TIME_FIELDS NowFields;
+	KeQuerySystemTime(&GelinTime);
+	ExSystemTimeToLocalTime(&GelinTime, &LocalTime);
+	RtlTimeToTimeFields(&LocalTime, &NowFields);
+	return NowFields.Hour * 3600 + NowFields.Minute * 60 + NowFields.Second;
 }

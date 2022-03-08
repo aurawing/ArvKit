@@ -1,3 +1,3 @@
 #pragma once
 
-int testSecp256k1();
+int ArvVerifySig(char *msg, char *sigStr, char *pkStr);

@@ -30,9 +30,6 @@
     <ClCompile Include="config.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sha256.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="libsecp256k1\src\precomputed_ecmult.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,6 +42,18 @@
     <ClCompile Include="crypto.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="libsha256\sha256.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libbase58\base58.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libripemd160\memzero.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libripemd160\ripemd160.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ArvFilter.rc">
@@ -53,9 +62,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sha256.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="crypto.h">

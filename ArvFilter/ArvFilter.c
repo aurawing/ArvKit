@@ -19,6 +19,7 @@ Environment:
 #include <ntifs.h>
 #include <Wdmsec.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "config.h"
 #include "crypto.h"
@@ -508,9 +509,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	PFLT_FILE_NAME_INFORMATION nameInfo;
 	UNICODE_STRING fullPath = { 0 };
 	UNICODE_STRING dosName = { 0 };
-	//HANDLE cProcessId = NULL;
-	//PEPROCESS cProcess = NULL;
-	//UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
 	PAGED_CODE();
 	if (KeGetCurrentIrql() >= DISPATCH_LEVEL)
@@ -523,112 +521,183 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		return status;
 	}
 	WCHAR LoginPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'i', 'n', '?', '\\' };
-	WCHAR LogoutPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'o', 'u', 't', '?', '\\' };
+	WCHAR LogoutPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'o', 't', '?', '\\' };
 	ULONG procID = FltGetRequestorProcessId(Data);
 	DbgPrint("[FsFilter:create]%d - %wZ\n", procID, &Data->Iopb->TargetFileObject->FileName);
 	if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[0] == LoginPath[0]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[1] == LoginPath[1]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[2] == LoginPath[2]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[3] == LoginPath[3]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[4] == LoginPath[4]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[5] == LoginPath[5]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[6] == LoginPath[6]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[7] == LoginPath[7]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[8] == LoginPath[8]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[9] == LoginPath[9]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[10] == LoginPath[10]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[11] == LoginPath[11]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[12] == LoginPath[12]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[13] == LoginPath[13]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[14] == LoginPath[14]) &&
+		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0) &&
 		(Data->Iopb->TargetFileObject->FileName.Buffer[fileNameLen / sizeof(wchar_t) - 1] == L'\\')
 		)
 	{
-		PWSTR logintag = (PWSTR)ExAllocatePoolWithTag(PagedPool, fileNameLen, 'LGI');
+		PSTR logintag = (PSTR)ExAllocatePoolWithTag(PagedPool, fileNameLen, 'LGI');
 		RtlZeroMemory(logintag, fileNameLen);
 		int b = 0;
-		PWSTR keyidstr = NULL;
-		PWSTR timestr = NULL;
+		PSTR keyidstr = NULL;
+		PSTR timestr = NULL;
+		PSTR sigstr = NULL;
+		bool isWChar = false;
+		int bPoint[3];
 		for (UINT a = 0; a < fileNameLen / sizeof(wchar_t); a++)
 		{
 			if (Data->Iopb->TargetFileObject->FileName.Buffer[a] != L'\\')
 			{
-				logintag[a] = Data->Iopb->TargetFileObject->FileName.Buffer[a];
+				if (Data->Iopb->TargetFileObject->FileName.Buffer[a]<256)
+				{
+					logintag[a] = Data->Iopb->TargetFileObject->FileName.Buffer[a];
+				}
+				else
+				{
+					isWChar = true; //路径不应包含多字节字符
+					break;
+				}
 			}
 			else
 			{
-				logintag[a] = L'\0';
-				if (b == 1)
+				logintag[a] = '\0';
+				if (b == 0)
 				{
+					bPoint[0] = a;
+				}
+				else if (b == 1)
+				{
+					bPoint[1] = a;
 					keyidstr = &logintag[a + 1];
 				}
 				else if (b == 2)
 				{
+					bPoint[2] = a;
 					timestr = &logintag[a + 1];
+				}
+				else if (b == 3)
+				{
+					sigstr = &logintag[a + 1];
 				}
 				b++;
 			}
 		}
-		int keyid = _wtoi(keyidstr);
-		//TODO: process timestamp
-		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
-		ArvMapRule(&filterConfig, procID, keyid);
-		ExReleaseResourceLite(&HashResource);
-		ExFreePoolWithTag(logintag, 'LGI');
-		return FLT_PREOP_COMPLETE;
-	}
-	else if ((Data->Iopb->TargetFileObject->FileName.Length > 16 * sizeof(wchar_t)) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[0] == LogoutPath[0]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[1] == LogoutPath[1]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[2] == LogoutPath[2]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[3] == LogoutPath[3]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[4] == LogoutPath[4]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[5] == LogoutPath[5]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[6] == LogoutPath[6]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[7] == LogoutPath[7]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[8] == LogoutPath[8]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[9] == LogoutPath[9]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[10] == LogoutPath[10]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[11] == LogoutPath[11]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[12] == LogoutPath[12]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[13] == LogoutPath[13]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[14] == LogoutPath[14]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[15] == LogoutPath[15]) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[fileNameLen / sizeof(wchar_t) - 1] == L'\\')
-		)
-	{
-		PWSTR logouttag = (PWSTR)ExAllocatePoolWithTag(PagedPool, fileNameLen, 'LGO');
-		RtlZeroMemory(logouttag, fileNameLen);
-		int b = 0;
-		PWSTR keyidstr = NULL;
-		PWSTR timestr = NULL;
-		for (UINT a = 0; a < fileNameLen / sizeof(wchar_t); a++)
+		if (isWChar || keyidstr == NULL || timestr == NULL || sigstr == NULL)
 		{
-			if (Data->Iopb->TargetFileObject->FileName.Buffer[a] != L'\\')
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			return FLT_PREOP_COMPLETE;
+		}
+		int keyid = atoi(keyidstr);
+		if (keyid == 0)
+		{
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			return FLT_PREOP_COMPLETE;
+		}
+
+		int timeBaseLine = ArvGetTime();
+		size_t timestrlen = strlen(timestr);
+		PSTR timestrTmp = (PSTR)ExAllocatePoolWithTag(PagedPool, timestrlen + 1, 'LGI');
+		RtlZeroMemory(timestrTmp, timestrlen + 1);
+		strcpy(timestrTmp, timestr);
+		char *hourstr = &timestrTmp[0];
+		char *minutestr = NULL;
+		char *secondstr = NULL;
+		int f = 0;
+		for (int e = 0; e < timestrlen; e++)
+		{
+			if (timestrTmp[e] == '-')
 			{
-				logouttag[a] = Data->Iopb->TargetFileObject->FileName.Buffer[a];
+				timestrTmp[e] = '\0';
+				if (f == 0)
+				{
+					minutestr = &timestrTmp[e+1];
+				}
+				if (f == 1)
+				{
+					secondstr = &timestrTmp[e + 1];
+				}
+				f++;
+			}
+		}
+		if (minutestr == NULL || secondstr == NULL)
+		{
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			ExFreePoolWithTag(timestrTmp, 'LGI');
+			return FLT_PREOP_COMPLETE;
+		}
+		int thour = atoi(hourstr);
+		int tminute = atoi(minutestr);
+		int tsecond = atoi(secondstr);
+		if (thour < 0 || tminute < 0 || tsecond < 0 || thour > 23 || tminute > 59 || tsecond > 59 || 3600*thour+60*tminute+tsecond-timeBaseLine < -100 || 3600 * thour + 60 * tminute + tsecond - timeBaseLine > 100)
+		{
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			ExFreePoolWithTag(timestrTmp, 'LGI');
+			return FLT_PREOP_COMPLETE;
+		}
+		ExFreePoolWithTag(timestrTmp, 'LGI');
+
+		ExAcquireResourceSharedLite(&HashResource, TRUE);
+		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
+		if (wPubKey == NULL)
+		{
+			ExReleaseResourceLite(&HashResource);
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			return FLT_PREOP_COMPLETE;
+		}
+		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(PagedPool, wPubKey->Length/sizeof(wchar_t) + 1, 'LGI');
+		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
+		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
+		{
+			if (wPubKey->Buffer[c] < 256)
+			{
+				pubKey[c] = wPubKey->Buffer[c];
 			}
 			else
 			{
-				logouttag[a] = L'\0';
-				if (b == 1)
-				{
-					keyidstr = &logouttag[a + 1];
-				}
-				else if (b == 2)
-				{
-					timestr = &logouttag[a + 1];
-				}
-				b++;
+				isWChar = true; //路径不应包含多字节字符
+				break;
 			}
 		}
-		int keyid = _wtoi(keyidstr);
-		//TODO: process timestamp
-		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
-		ArvRemoveProc(&filterConfig, procID, keyid);
+		if (isWChar)
+		{
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			ExFreePoolWithTag(pubKey, 'LGI');
+			ExReleaseResourceLite(&HashResource);
+			return FLT_PREOP_COMPLETE;
+		}
+		for (UINT d = 0; d < 3; d++)
+		{
+			logintag[bPoint[d]] = '\\';
+		}
+		bool verified = ArvVerifySig(logintag, sigstr, pubKey);
+		if (!verified)
+		{
+			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+			Data->IoStatus.Information = 0;
+			ExFreePoolWithTag(logintag, 'LGI');
+			ExFreePoolWithTag(pubKey, 'LGI');
+			ExReleaseResourceLite(&HashResource);
+			return FLT_PREOP_COMPLETE;
+		}
 		ExReleaseResourceLite(&HashResource);
-		ExFreePoolWithTag(logouttag, 'LGO');
+
+		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0)
+		{
+			ArvMapRule(&filterConfig, procID, keyid);
+		}
+		else if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0)
+		{
+			ArvRemoveProc(&filterConfig, procID, keyid);
+		}
+		ExReleaseResourceLite(&HashResource);
+		ExFreePoolWithTag(logintag, 'LGI');
+		ExFreePoolWithTag(pubKey, 'LGI');
 		return FLT_PREOP_COMPLETE;
 	}
 	ExAcquireResourceSharedLite(&HashResource, TRUE);
@@ -637,8 +706,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExReleaseResourceLite(&HashResource);
 		return status;
 	}
-	//ExReleaseResourceLite(&HashResource);
-	//ExAcquireResourceSharedLite(&HashResource, TRUE);
 	__try
 	{
 		status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &nameInfo);
@@ -1062,7 +1129,9 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	UNICODE_STRING uniString;
 	DbgPrint("[FsFilter:register]registry path: %wZ\n", *RegistryPath);
 	__try {
-		int ret = testSecp256k1();
+		//int ret = testSecp256k1();
+		//bool ret = ArvVerifySig("test123", "SIG_K1_KmAZfXPHxnnPr4TC6PZs547hruSKRCd583kug9HTYPN76YQfJayeBVdkDSEg1PWwCurnqDhbsr3BiwSjCYLggkYHUVdmgq", "6ZDdiLbKdXP4W7F3gqXccQCHYARnMnbunRNNo8WjHHBvB5EN17");
+
 		ArvInitializeFilterConfig(&filterConfig);
 		ExInitializeResourceLite(&HashResource);
 		status = FltRegisterFilter(DriverObject, &g_filterRegistration, &g_minifilterHandle);
