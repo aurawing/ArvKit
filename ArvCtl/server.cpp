@@ -99,55 +99,62 @@ void process(WFHttpTask *server_task)
 			int id = idEntry->valueint;
 			cJSON *pkEntry = cJSON_GetObjectItem(jsonHead, "pubkey");
 			PSTR pubkey = pkEntry->valuestring;
-			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
-			int pathLen = cJSON_GetArraySize(pathEntry);
-			if (id > 0 && pathLen > 0)
+			if (!VerifyPublicKey(pubkey))
 			{
-				BOOL flag = TRUE;
-				PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
-				for (int i = 0; i < pathLen; i++)
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -22, \"msg\": \"wrong format of public key\", \"data\": {}}");
+			}
+			else
+			{
+				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
+				int pathLen = cJSON_GetArraySize(pathEntry);
+				if (id > 0 && pathLen > 0)
 				{
-					cJSON *pJsonPath = cJSON_GetArrayItem(pathEntry, i);
-					if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+					BOOL flag = TRUE;
+					PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
+					for (int i = 0; i < pathLen; i++)
 					{
-						flag = false;
-						break;
+						cJSON *pJsonPath = cJSON_GetArrayItem(pathEntry, i);
+						if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+						{
+							flag = false;
+							break;
+						}
+						paths[i] = pJsonPath->valuestring;
 					}
-					paths[i] = pJsonPath->valuestring;
-				}
-				if (flag)
-				{
-					UpdateConfig(id, pubkey, paths, pathLen);
-					free(paths);
-					user_resp->set_status_code("200");
-					char* jsonstr = PrintJsonConfig();
-					if (jsonstr != NULL)
+					if (flag)
 					{
-						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
-						user_resp->append_output_body(jsonstr);
-						user_resp->append_output_body("}");
-						free(jsonstr);
+						UpdateConfig(id, pubkey, paths, pathLen);
+						free(paths);
+						user_resp->set_status_code("200");
+						char* jsonstr = PrintJsonConfig();
+						if (jsonstr != NULL)
+						{
+							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+							user_resp->append_output_body(jsonstr);
+							user_resp->append_output_body("}");
+							free(jsonstr);
+						}
+						else
+						{
+							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+						}
 					}
 					else
 					{
-						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+						free(paths);
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
 					}
 				}
 				else
 				{
-					free(paths);
 					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
+					user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
 				}
 			}
-			else
-			{
-				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
-			}
-			
 		}
-		else if (ifnamestr == "getconf")
+		else if (ifnamestr == "loadconf")
 		{
 			char* jsonstr = PrintJsonConfig();
 			if (jsonstr != NULL)

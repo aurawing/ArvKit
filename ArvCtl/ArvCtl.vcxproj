@@ -106,10 +106,10 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir)\ArvCtl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\ArvCtl\include;$(SolutionDir)\ArvCtl\libbase58;$(SolutionDir)\ArvCtl\libripemd160;$(SolutionDir)\ArvCtl\libsha256;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -150,7 +150,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir)\ArvCtl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\ArvCtl\include;$(SolutionDir)\ArvCtl\libbase58;$(SolutionDir)\ArvCtl\libripemd160;$(SolutionDir)\ArvCtl\libsha256;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -165,15 +165,17 @@
     <ClCompile Include="ArvCtl.cpp" />
     <ClCompile Include="config.cpp" />
     <ClCompile Include="cSJON.c" />
+    <ClCompile Include="libbase58\base58.cpp" />
+    <ClCompile Include="libripemd160\memzero.cpp" />
+    <ClCompile Include="libripemd160\ripemd160.cpp" />
+    <ClCompile Include="libsha256\sha256.cpp" />
     <ClCompile Include="server.cpp" />
-    <ClCompile Include="sha256.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cJSON.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="server.h" />
-    <ClInclude Include="sha256.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

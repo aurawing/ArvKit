@@ -58,3 +58,4 @@ BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
 //VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);
 void GetDiskInfo(PArvDiskInfo diskInfo);
+bool VerifyPublicKey(PSTR pubkey58);

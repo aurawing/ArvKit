@@ -1,4 +1,6 @@
 #include "utils.h"
+#include "base58.h"
+#include "ripemd160.h"
 
 //HRESULT InitCommunicationPort(HANDLE *hPort)
 //{
@@ -149,4 +151,32 @@ void GetDiskInfo(PArvDiskInfo diskInfo)
 	}
 	diskInfo->totalBytes = totalBytes;
 	diskInfo->totalFreeBytes = totalFreeBytes;
+}
+
+bool VerifyPublicKey(PSTR pubkey58)
+{
+	size_t pubkey58len = strlen(pubkey58);
+	if (pubkey58len > 51)
+	{
+		return false;
+	}
+	size_t pubkeylen = 40; //公钥长度
+	unsigned char pubkeybytes[40];
+	bool ret = b58tobin(pubkeybytes, &pubkeylen, pubkey58, pubkey58len);
+	if (!ret)
+	{
+		return false; //base58解码失败
+	}
+	if (pubkeylen != 37)
+	{
+		return false; //公钥长度不对
+	}
+	unsigned char *rawpubkey = (unsigned char*)pubkeybytes + 40 - pubkeylen; //公钥
+	uint8_t pubkeyhash[20];
+	ripemd160(rawpubkey, 33, pubkeyhash);
+	if (memcmp(&rawpubkey[33], pubkeyhash, 4) != 0)
+	{
+		return false; //checksum不对
+	}
+	return true;
 }

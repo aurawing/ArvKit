@@ -27,10 +27,19 @@
     <ClCompile Include="utils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="sha256.cpp">
+    <ClCompile Include="config.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="config.cpp">
+    <ClCompile Include="libsha256\sha256.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="libripemd160\ripemd160.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="libripemd160\memzero.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="libbase58\base58.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -42,9 +51,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="server.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="sha256.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="config.h">
