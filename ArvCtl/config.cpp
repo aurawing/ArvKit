@@ -94,11 +94,11 @@ BOOL ConfigArvFilter()
 	{
 		pRule = (POpRule)malloc(sizeof(OpRule));
 		pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "ID");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "id");
 		pRule->id = pJsonRuleItem->valueint;
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "PublicKey");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "pubkey");
 		UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "Paths");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "path");
 		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
 		pRule->pathsLen = pathLen;
 		pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
@@ -156,7 +156,7 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen)
 	for (int i = 0; i < ruleSize; i++)
 	{
 		pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "ID");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "id");
 		if (pJsonRuleItem->valueint == id)
 		{
 			selindex = i;
@@ -165,9 +165,9 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen)
 	}
 	cJSON *item = cJSON_CreateObject();
 	cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
-	cJSON_AddItemToObject(item, "ID", cJSON_CreateNumber(id));
-	cJSON_AddItemToObject(item, "PublicKey", cJSON_CreateString(pubkey));
-	cJSON_AddItemToObject(item, "Paths", pathItem);
+	cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(id));
+	cJSON_AddItemToObject(item, "pubkey", cJSON_CreateString(pubkey));
+	cJSON_AddItemToObject(item, "path", pathItem);
 	if (selindex >= 0)
 	{
 		cJSON_ReplaceItemInArray(jsonConfig, selindex, item);

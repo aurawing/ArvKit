@@ -54,6 +54,9 @@
     <ClCompile Include="libripemd160\ripemd160.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="init.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ArvFilter.rc">
@@ -65,6 +68,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="crypto.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

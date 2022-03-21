@@ -1,3 +1,4 @@
+#include <ntifs.h>
 #include <wdm.h>
 
 #include "config.h"
@@ -210,4 +211,20 @@ int ArvGetTime()
 	ExSystemTimeToLocalTime(&GelinTime, &LocalTime);
 	RtlTimeToTimeFields(&LocalTime, &NowFields);
 	return NowFields.Hour * 3600 + NowFields.Minute * 60 + NowFields.Second;
+}
+
+ULONG ArvGetUnixTimestamp()
+{
+	LARGE_INTEGER GelinTime = { 0 };
+	ULONG ts = 0;
+	KeQuerySystemTime(&GelinTime);
+	BOOLEAN ret = RtlTimeToSecondsSince1970(&GelinTime, &ts);
+	if (ret)
+	{
+		return ts;
+	}
+	else
+	{
+		return 0;
+	}
 }
