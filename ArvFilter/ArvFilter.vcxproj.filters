@@ -73,5 +73,11 @@
     <ClInclude Include="init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="context.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

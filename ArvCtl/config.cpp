@@ -86,7 +86,9 @@ BOOL ConfigArvFilter()
 	int ruleSize = cJSON_GetArraySize(jsonConfig);
 	cJSON *pJsonRule;
 	cJSON *pJsonRuleItem;
+	cJSON *pJsonPathItem;
 	cJSON *pJsonPath;
+	cJSON *pJsonIsDB;
 	POpRule pRule;
 	POpRule *pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
 	HRESULT result = S_OK;
@@ -98,14 +100,21 @@ BOOL ConfigArvFilter()
 		pRule->id = pJsonRuleItem->valueint;
 		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "pubkey");
 		UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "path");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "paths");
 		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
 		pRule->pathsLen = pathLen;
 		pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
+		pRule->isDB = (BOOL*)malloc(pathLen * sizeof(BOOL));
 		for (int j = 0; j < pathLen; j++)
 		{
-			pJsonPath = cJSON_GetArrayItem(pJsonRuleItem, j);
+			pJsonPathItem = cJSON_GetArrayItem(pJsonRuleItem, j);
+			pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
+			pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
 			UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
+			if (cJSON_IsTrue(pJsonIsDB))
+				pRule->isDB[j] = TRUE;
+			else if (cJSON_IsFalse(pJsonIsDB))
+				pRule->isDB[j] = FALSE;
 		}
 		pzpRules[i] = pRule;
 	}
@@ -116,6 +125,7 @@ BOOL ConfigArvFilter()
 	}
 	result = SendSetRulesMessage(pzpRules, ruleSize);
 	FreeRuleList(pzpRules, ruleSize);
+	free(pzpRules);
 	pzpRules = NULL;
 
 	errno_t err;
@@ -141,7 +151,7 @@ BOOL ConfigArvFilter()
 	}
 }
 
-BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen)
+BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen)
 {
 	AcquireSRWLockExclusive(&configLock);
 	if (jsonConfig == NULL)
@@ -164,10 +174,19 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen)
 		}
 	}
 	cJSON *item = cJSON_CreateObject();
-	cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
+	cJSON *pathItem = cJSON_CreateArray();
+	for (int j = 0; j < pathLen; j++)
+	{
+		cJSON *innerItem = cJSON_CreateObject();
+		cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(paths[j]));
+		cJSON_AddItemToObject(innerItem, "crypt", cJSON_CreateBool(isDBs[j]));
+		cJSON_AddItemToArray(pathItem, innerItem);
+	}
+
+	//cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
 	cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(id));
 	cJSON_AddItemToObject(item, "pubkey", cJSON_CreateString(pubkey));
-	cJSON_AddItemToObject(item, "path", pathItem);
+	cJSON_AddItemToObject(item, "paths", pathItem);
 	if (selindex >= 0)
 	{
 		cJSON_ReplaceItemInArray(jsonConfig, selindex, item);
@@ -178,4 +197,88 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen)
 	}
 	ReleaseSRWLockExclusive(&configLock);
 	return ConfigArvFilter();
+}
+
+BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB)
+{
+	AcquireSRWLockExclusive(&configLock);
+	if (jsonConfig == NULL)
+	{
+		return FALSE;
+	}
+	int ruleSize = cJSON_GetArraySize(jsonConfig);
+	cJSON *pJsonRule = NULL;
+	cJSON *pJsonRuleItem = NULL;
+	cJSON *pJsonPath = NULL;
+	int selindex = -1;
+	for (int i = 0; i < ruleSize; i++)
+	{
+		pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "id");
+		if (pJsonRuleItem->valueint == id)
+		{
+			selindex = i;
+			break;
+		}
+	}
+	if (selindex == -1)
+	{
+		ReleaseSRWLockExclusive(&configLock);
+		return FALSE;
+	}
+	pJsonPath = cJSON_GetObjectItem(pJsonRule, "paths");
+	int pathLen = cJSON_GetArraySize(pJsonPath);
+	for (int j = 0; j < pathLen; j++)
+	{
+		cJSON *pJsonPathItem = cJSON_GetArrayItem(pJsonPath, j);
+		cJSON *pJsonPathInner = cJSON_GetObjectItem(pJsonPathItem, "path");
+		cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+		if (strcmp(pJsonPathInner->valuestring, path)==0)
+		{
+			cJSON_ReplaceItemInObject(pJsonPathItem, "crypt", cJSON_CreateBool(isDB));
+			break;
+		}
+	}
+	ReleaseSRWLockExclusive(&configLock);
+	return ConfigArvFilter();
+}
+
+PSTR LoadDBConf()
+{
+	PSTR str = NULL;
+	AcquireSRWLockShared(&configLock);
+	cJSON *jsonDBConf = cJSON_CreateArray();
+	if (jsonConfig != NULL) {
+		int ruleSize = cJSON_GetArraySize(jsonConfig);
+		cJSON *pJsonRule;
+		cJSON *pJsonID;
+		cJSON *pJsonPath;
+		cJSON *pJsonPathItem;
+		cJSON *pJsonPath2;
+		cJSON *pJsonIsDB;
+		for (int i = 0; i < ruleSize; i++)
+		{
+			pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
+			pJsonID = cJSON_GetObjectItem(pJsonRule, "id");
+			pJsonPath = cJSON_GetObjectItem(pJsonRule, "paths");
+			int pathLen = cJSON_GetArraySize(pJsonPath);
+			for (int j = 0; j < pathLen; j++)
+			{
+				pJsonPathItem = cJSON_GetArrayItem(pJsonPath, j);
+				pJsonPath2 = cJSON_GetObjectItem(pJsonPathItem, "path");
+				pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+				if (cJSON_IsTrue(pJsonIsDB))
+				{
+					cJSON *innerItem = cJSON_CreateObject();
+					cJSON_AddItemToObject(innerItem, "id", cJSON_CreateNumber(pJsonID->valueint));
+					cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(pJsonPath2->valuestring));
+					cJSON_AddItemToArray(jsonDBConf, innerItem);
+				}
+			}
+		}
+
+	}
+	ReleaseSRWLockShared(&configLock);
+	str = cJSON_Print(jsonDBConf);
+	return str;
 }

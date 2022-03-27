@@ -477,7 +477,6 @@ clean:
 */
 BOOL RestartArvFilter()
 {
-
 	SC_HANDLE hSCM = NULL;
 	SC_HANDLE hSer = NULL;
 	SERVICE_STATUS serStatus = { 0 };

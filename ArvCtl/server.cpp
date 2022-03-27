@@ -93,7 +93,7 @@ void process(WFHttpTask *server_task)
 				cJSON_Delete(root);
 			}
 		}
-		else if (ifnamestr == "saveconf")
+		else if (ifnamestr == "saveconf2")
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
 			int id = idEntry->valueint;
@@ -106,26 +106,34 @@ void process(WFHttpTask *server_task)
 			}
 			else
 			{
-				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
+				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "paths");
 				int pathLen = cJSON_GetArraySize(pathEntry);
 				if (id > 0 && pathLen > 0)
 				{
 					BOOL flag = TRUE;
 					PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
+					BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
 					for (int i = 0; i < pathLen; i++)
 					{
-						cJSON *pJsonPath = cJSON_GetArrayItem(pathEntry, i);
+						cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
+						cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
+						cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
 						if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
 						{
 							flag = false;
 							break;
 						}
 						paths[i] = pJsonPath->valuestring;
+						if (cJSON_IsTrue(pJsonIsDB))
+							isDBs[i] = TRUE;
+						else if (cJSON_IsFalse(pJsonIsDB))
+							isDBs[i] = FALSE;
 					}
 					if (flag)
 					{
-						UpdateConfig(id, pubkey, paths, pathLen);
+						UpdateConfig(id, pubkey, paths, isDBs, pathLen);
 						free(paths);
+						free(isDBs);
 						user_resp->set_status_code("200");
 						char* jsonstr = PrintJsonConfig();
 						if (jsonstr != NULL)
@@ -143,6 +151,7 @@ void process(WFHttpTask *server_task)
 					else
 					{
 						free(paths);
+						free(isDBs);
 						user_resp->set_status_code("500");
 						user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
 					}
@@ -154,7 +163,24 @@ void process(WFHttpTask *server_task)
 				}
 			}
 		}
-		else if (ifnamestr == "loadconf")
+		else if (ifnamestr == "savedbconf")
+		{
+			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
+			int id = idEntry->valueint;
+			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
+			BOOL ret = UpdateDBPath(id, pathEntry->valuestring, TRUE);
+			if (ret)
+			{
+				user_resp->set_status_code("200");
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+			}
+			else
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -30, \"msg\": \"parse parameter failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "loadconf2")
 		{
 			char* jsonstr = PrintJsonConfig();
 			if (jsonstr != NULL)
@@ -170,10 +196,18 @@ void process(WFHttpTask *server_task)
 			}
 			user_resp->set_status_code("200");
 		}
+		else if (ifnamestr == "loaddbconf")
+		{
+			PSTR conf = LoadDBConf();
+			user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+			user_resp->append_output_body(conf);
+			user_resp->append_output_body("}");
+			free(conf);
+		}
 		else
 		{
 			user_resp->set_status_code("450");
-			user_resp->append_output_body("{\"code\": -30, \"msg\": \"no matched action\", \"data\": {}}");
+			user_resp->append_output_body("{\"code\": -40, \"msg\": \"no matched action\", \"data\": {}}");
 		}
 	}
 	else

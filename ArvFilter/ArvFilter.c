@@ -34,6 +34,7 @@ typedef enum _OP_COMMAND {  //操作命令
 	SET_PROC,
 	SET_RULES,
 	GET_STAT,
+	SET_DB_CONF,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -52,6 +53,7 @@ typedef struct _OpRule {
 	UINT id;
 	PWSTR pubKey;
 	PZPWSTR paths;
+	BOOL *isDB;
 	UINT pathsLen;
 } OpRule, *POpRule;
 
@@ -61,11 +63,11 @@ typedef struct _OpSetRules { //操作数据
 	UINT		ruleLen;
 } OpSetRules, *POpSetRules;
 
-//typedef struct _RepStat { //返回统计信息
-//	BYTE SHA256[SHA256_BLOCK_SIZE];
-//	LONG Pass;
-//	LONG Block;
-//} RepStat, *PRepStat;
+typedef struct _OpSetDBConf { //设置DB路径
+	OpCommand command;
+	UINT id;
+	PWSTR path;
+} OpSetDBConf, *POpSetDBConf;
 
 typedef struct _RepStat { //返回统计信息
 	//BYTE SHA256[SHA256_BLOCK_SIZE];
@@ -1178,6 +1180,7 @@ MiniMessage(
 		DbgPrint("[FsFilter:MiniMessage]received message\n");
 		OpSetProc *pOpSetProc = NULL;
 		OpSetRules *pOpSetRules = NULL;
+		OpSetDBConf *pOpSetDBConf = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -1201,7 +1204,7 @@ MiniMessage(
 				pOpSetRules = (OpSetRules*)InputBuffer;
 				for (UINT i = 0; i < pOpSetRules->ruleLen; i++)
 				{
-					PRuleEntry newRuleEntry = ArvAddRule(&tmpConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->pathsLen);
+					PRuleEntry newRuleEntry = ArvAddRule(&tmpConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->isDB, pOpSetRules->rules[i]->pathsLen);
 					
 					PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
 					while (pListEntry != &filterConfig.Rules)
@@ -1252,6 +1255,15 @@ MiniMessage(
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
+			case SET_DB_CONF:
+				pOpSetDBConf = (OpSetDBConf*)InputBuffer;
+				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				BOOL ret2 = ArvSetDBConf(&filterConfig, pOpSetDBConf->id, pOpSetDBConf->path);
+				ExReleaseResourceLite(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]set DB conf %d: %d - %ws\n", ret2, pOpSetDBConf->id, pOpSetDBConf->path);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
 			case GET_STAT:
 				ExAcquireResourceSharedLite(&HashResource, TRUE);
 				PRepStat pStats = (PRepStat)OutputBuffer;
@@ -1299,6 +1311,7 @@ MiniMessage(
 
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
+	ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 	NTSTATUS status = STATUS_SUCCESS;
 	PSECURITY_DESCRIPTOR sd = NULL;
 	OBJECT_ATTRIBUTES oa = { 0 };

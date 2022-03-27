@@ -90,6 +90,18 @@ HRESULT SendSetRulesMessage(POpRule *rules, UINT len)
 	return hResult;
 }
 
+HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path)
+{
+	HRESULT hResult = S_OK;
+	OpSetDBConf msg;
+	memset(&msg, 0, sizeof(OpSetDBConf));
+	msg.command = SET_DB_CONF;
+	msg.id = ruleID;
+	msg.path = path;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 {
 	DWORD dwUnicodeLen;    //转换后Unicode的长度
@@ -119,6 +131,10 @@ VOID FreeRuleList(POpRule *pzpRules, int ruleSize)
 			free(pOpRule->paths[j]);
 			pOpRule->paths[j] = NULL;
 		}
+		free(pOpRule->paths);
+		pOpRule->paths = NULL;
+		free(pOpRule->isDB);
+		pOpRule->isDB = NULL;
 		pOpRule->pathsLen = 0;
 		free(pOpRule);
 		pOpRule = NULL;

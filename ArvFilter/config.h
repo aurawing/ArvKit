@@ -12,6 +12,7 @@ typedef struct _PathStat {
 typedef struct _PathEntry {
 	LIST_ENTRY entry;
 	UNICODE_STRING Path;
+	BOOL isDB;
 	PathStat stat;
 
 } PathEntry, *PPathEntry;
@@ -38,12 +39,13 @@ typedef struct _FilterConfig {
 } FilterConfig, *PFilterConfig;
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
-PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen);
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvFreeRule(PRuleEntry pRuleEntry);
 PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
+BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);

@@ -9,7 +9,7 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 	InitializeListHead(&pFilterConfig->Rules);
 }
 
-PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, UINT pathsLen)
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen)
 {
 	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(PagedPool, sizeof(RuleEntry), 'RLE');
 	RtlZeroMemory(pRuleEntry, sizeof(RuleEntry));
@@ -34,6 +34,7 @@ PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWST
 			pPathEntry->Path.Buffer[k] = path[k];
 		}
 		pPathEntry->Path.Length = pPathEntry->Path.MaximumLength = (USHORT)pathLen * sizeof(wchar_t);
+		pPathEntry->isDB = isDBs[j];
 		InsertTailList(&pRuleEntry->Dirs, &pPathEntry->entry);
 	}
 	InsertTailList(&pFilterConfig->Rules, &pRuleEntry->entry);
@@ -121,23 +122,6 @@ VOID ArvFreeRules(PFilterConfig pFilterConfig)
 		PLIST_ENTRY pDelRuleEntry = RemoveTailList(&pFilterConfig->Rules);
 		PRuleEntry pRuleEntry = CONTAINING_RECORD(pDelRuleEntry, RuleEntry, entry);
 		ArvFreeRule(pRuleEntry);
-		/*pRuleEntry->ID = 0;
-		ArvFreeUnicodeString(&pRuleEntry->PubKey, 'RLE');
-		while (pRuleEntry->Dirs.Flink != &pRuleEntry->Dirs)
-		{
-			PLIST_ENTRY pDelPathEntry = RemoveTailList(&pRuleEntry->Dirs);
-			PPathEntry pPathEntry = CONTAINING_RECORD(pDelPathEntry, PathEntry, entry);
-			ArvFreeUnicodeString(&pPathEntry->Path, 'PTE');
-			ExFreePoolWithTag(pPathEntry, 'PTE');
-		}
-		while (pRuleEntry->Procs.Flink != &pRuleEntry->Procs)
-		{
-			PLIST_ENTRY pDelProcEntry = RemoveTailList(&pRuleEntry->Procs);
-			PProcEntry pProcEntry = CONTAINING_RECORD(pDelProcEntry, ProcEntry, entry);
-			pProcEntry->ProcID = 0;
-			ExFreePoolWithTag(pProcEntry, 'FME');
-		}
-		ExFreePoolWithTag(pRuleEntry, 'RLE');*/
 	}
 	InitializeListHead(&pFilterConfig->Rules);
 }
@@ -151,6 +135,7 @@ VOID ArvFreeRule(PRuleEntry pRuleEntry)
 		PLIST_ENTRY pDelPathEntry = RemoveTailList(&pRuleEntry->Dirs);
 		PPathEntry pPathEntry = CONTAINING_RECORD(pDelPathEntry, PathEntry, entry);
 		ArvFreeUnicodeString(&pPathEntry->Path, 'PTE');
+		pPathEntry->isDB = FALSE;
 		ExFreePoolWithTag(pPathEntry, 'PTE');
 	}
 	while (pRuleEntry->Procs.Flink != &pRuleEntry->Procs)
@@ -161,6 +146,32 @@ VOID ArvFreeRule(PRuleEntry pRuleEntry)
 		ExFreePoolWithTag(pProcEntry, 'FME');
 	}
 	ExFreePoolWithTag(pRuleEntry, 'RLE');
+}
+
+BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
+	while (pListEntry != &pFilterConfig->Rules)
+	{
+		PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		if (pRuleEntry->ID == ruleID)
+		{
+			PLIST_ENTRY pListEntry2 = pRuleEntry->Dirs.Flink;
+			while (pListEntry2 != &pRuleEntry->Dirs)
+			{
+				PPathEntry ppe = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
+				if (memcmp(ppe->Path.Buffer, path, ppe->Path.Length * sizeof(wchar_t)) == 0)
+				{
+					DbgPrint("[FsFilter:setDBPath]existed %wZ\n", ppe->Path);
+					ppe->isDB = TRUE;
+					return TRUE;
+				}
+				pListEntry2 = pListEntry2->Flink;
+			}
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return FALSE;
 }
 
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID)

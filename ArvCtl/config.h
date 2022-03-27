@@ -10,4 +10,6 @@ BOOL InitConfig();
 PSTR PrintJsonConfig();
 void ClearConfig();
 BOOL ConfigArvFilter();
-BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, UINT pathLen);
+BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen);
+BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB);
+PSTR LoadDBConf();
