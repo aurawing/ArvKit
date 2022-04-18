@@ -1,7 +1,4 @@
-#include <ntifs.h>
-#include <wdm.h>
-
-#include "config.h"
+#include "pch.h"
 #include "sha256.h"
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)

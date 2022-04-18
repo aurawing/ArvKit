@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <tchar.h>
 #include <string>
 #include "workflow/HttpMessage.h"
 #include "workflow/HttpUtil.h"
@@ -87,6 +88,9 @@ void process(WFHttpTask *server_task)
 				cJSON_AddItemToObject(item, "writenumber", cJSON_CreateNumber(kernelStat.Write));
 				cJSON_AddItemToObject(item, "readnumber", cJSON_CreateNumber(kernelStat.Read));
 				cJSON_AddItemToObject(item, "illegalaccess", cJSON_CreateNumber(kernelStat.Block));
+				cJSON_AddItemToObject(item, "dbwritenumber", cJSON_CreateNumber(kernelStat.WriteDB));
+				cJSON_AddItemToObject(item, "dbreadnumber", cJSON_CreateNumber(kernelStat.ReadDB));
+				cJSON_AddItemToObject(item, "dbillegalaccess", cJSON_CreateNumber(kernelStat.BlockDB));
 				char* jsonstr = cJSON_Print(root);
 				user_resp->append_output_body(jsonstr);
 				user_resp->set_status_code("200");
@@ -106,7 +110,7 @@ void process(WFHttpTask *server_task)
 			}
 			else
 			{
-				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "paths");
+				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
 				int pathLen = cJSON_GetArraySize(pathEntry);
 				if (id > 0 && pathLen > 0)
 				{
@@ -204,10 +208,88 @@ void process(WFHttpTask *server_task)
 			user_resp->append_output_body("}");
 			free(conf);
 		}
+		else if (ifnamestr == "savedaemonconf")
+		{
+			TCHAR daemonExePath[MAX_PATH];
+			GetModuleFileName(NULL, daemonExePath, MAX_PATH);
+			WCHAR *ch = wcsrchr(daemonExePath, '\\');
+			ch[1] = L'a';
+			ch[2] = L'r';
+			ch[3] = L'v';
+			ch[4] = L'd';
+			ch[5] = L'a';
+			ch[6] = L'e';
+			ch[7] = L'm';
+			ch[8] = L'o';
+			ch[9] = L'n';
+			ch[10] = L'.';
+			ch[11] = L'e';
+			ch[12] = L'x';
+			ch[13] = L'e';
+			ch[14] = L'\0';
+			cJSON *daemonNameEntry = cJSON_GetObjectItem(jsonHead, "daemonName");
+			cJSON *exeNameEntry = cJSON_GetObjectItem(jsonHead, "exeName");
+			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
+			PWSTR dpath = NULL;
+			UTF8ToUnicode(daemonNameEntry->valuestring, &dpath);
+			int len = CopyByBlock(dpath, daemonExePath);
+			if (len < 0)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -40, \"msg\": \"copy daemon failed\", \"data\": {}}");
+			}
+			else
+			{
+				BOOL ret = UpdateDaemonConfig(daemonNameEntry->valuestring, exeNameEntry->valuestring, keyIDEntry->valueint);
+				if (ret) {
+					//char *jsonstr = PrintDaemonConfig(NULL);
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					//user_resp->append_output_body(jsonstr);
+					//user_resp->append_output_body("}");
+					//free(jsonstr);
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -41, \"msg\": \"parse parameter failed\", \"data\": {}}");
+				}
+			}
+			if (dpath != NULL)
+			{
+				free(dpath);
+			}
+		}
+		else if (ifnamestr == "loaddaemonconf")
+		{
+			cJSON *daemonEntry = cJSON_GetObjectItem(jsonHead, "daemonName");
+			char *jsonstr = NULL;
+			if (daemonEntry == NULL)
+			{
+				jsonstr = PrintDaemonConfig(NULL);
+			}
+			else
+			{
+				jsonstr = PrintDaemonConfig(daemonEntry->valuestring);
+			}
+			if (jsonstr==NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -50, \"msg\": \"no daemon configuration found\", \"data\": {}}");
+			}
+			else
+			{
+				user_resp->set_status_code("200");
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+				user_resp->append_output_body(jsonstr);
+				user_resp->append_output_body("}");
+				free(jsonstr);
+			}
+		}
 		else
 		{
 			user_resp->set_status_code("450");
-			user_resp->append_output_body("{\"code\": -40, \"msg\": \"no matched action\", \"data\": {}}");
+			user_resp->append_output_body("{\"code\": -99, \"msg\": \"no matched action\", \"data\": {}}");
 		}
 	}
 	else
@@ -224,8 +306,35 @@ static WFHttpServer server(process);
 bool StartArvCtlServer()
 {
 	//WFHttpServer server(process);
-	if (server.start(8888) == 0)
+	if (server.start(listenPort) == 0)
 	{
+		HKEY hKey = NULL;
+		TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+		LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+		if (lRet == ERROR_SUCCESS) {
+			RegDeleteValue(hKey, _T("listenPort"));
+			RegDeleteValue(hKey, _T("keyManageAddr"));
+			DWORD dwValuePort = (DWORD)listenPort;
+			if (ERROR_SUCCESS != RegSetValueEx(hKey, _T("listenPort"), 0, REG_DWORD, (CONST BYTE*)&dwValuePort, sizeof(DWORD)))
+			{
+				RegCloseKey(hKey);
+				return false;
+			}
+			
+			PWSTR kma;
+			UTF8ToUnicode(keyManageAddr, &kma);
+			DWORD len = sizeof(TCHAR)*(wcslen(kma) + 1);
+			if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("keyManageAddr"), 0, REG_SZ, (const BYTE*)kma, len))
+			{
+				RegCloseKey(hKey);
+				return false;
+			}
+			RegCloseKey(hKey);
+		}
+		else
+		{
+			return false;
+		}
 		return true;
 	}
 	else
@@ -237,4 +346,13 @@ bool StartArvCtlServer()
 void StopArvCtlServer()
 {
 	server.stop();
+	HKEY hKey = NULL;
+	TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+	LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+	if (lRet == ERROR_SUCCESS) {
+		RegDeleteValue(hKey, _T("listenPort"));
+		RegDeleteValue(hKey, _T("keyManageAddr"));
+		RegCloseKey(hKey);
+	}
 }
+

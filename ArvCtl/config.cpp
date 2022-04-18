@@ -5,8 +5,85 @@ cJSON *jsonConfig = NULL;
 TCHAR configPath[MAX_PATH];
 SRWLOCK configLock;
 
+cJSON *daemonConfig = NULL;
+TCHAR daemonPath[MAX_PATH];
+SRWLOCK daemonLock;
+
+TCHAR serConfigPath[MAX_PATH];
+UINT listenPort;
+char *keyManageAddr;
+
+BOOL InitSysConfig()
+{
+	GetModuleFileName(NULL, serConfigPath, MAX_PATH);
+	WCHAR *ch = wcsrchr(serConfigPath, '\\');
+	ch[1] = L's';
+	ch[2] = L'e';
+	ch[3] = L'r';
+	ch[4] = L'v';
+	ch[5] = L'i';
+	ch[6] = L'c';
+	ch[7] = L'e';
+	ch[8] = L'.';
+	ch[9] = L'j';
+	ch[10] = L's';
+	ch[11] = L'o';
+	ch[12] = L'n';
+	ch[13] = L'\0';
+	errno_t err;
+	FILE *fp;
+	int file_size;
+	if (_waccess(serConfigPath, 0))
+	{
+		listenPort = 8888;
+		keyManageAddr = (char*)"http://127.0.0.1:8080";
+		return TRUE;
+	}
+	err = _wfopen_s(&fp, serConfigPath, L"rb");
+	if (err != 0)
+	{
+		return FALSE;
+	}
+	fseek(fp, 0, SEEK_END);
+	file_size = ftell(fp);
+	char *tmp;
+	fseek(fp, 0, SEEK_SET);
+	size_t allocSize = file_size * sizeof(char) + sizeof(char);
+	tmp = (char *)malloc(allocSize);
+	memset(tmp, 0, allocSize);
+	fread(tmp, sizeof(char), file_size, fp);
+	fclose(fp);
+	cJSON *serConfig = cJSON_Parse(tmp);
+	free(tmp);
+	cJSON *pJsonPort = cJSON_GetObjectItem(serConfig, "listenPort");
+	cJSON *pJsonKMA = cJSON_GetObjectItem(serConfig, "keyManageAddr");
+	if (pJsonPort == NULL)
+	{
+		listenPort = 8888;
+	}
+	else
+	{
+		listenPort = pJsonPort->valueint;
+	}
+	if (pJsonKMA == NULL)
+	{
+		keyManageAddr = (char*)"http://127.0.0.1:8080";
+	}
+	else
+	{
+		size_t s = strlen(pJsonKMA->valuestring);
+		keyManageAddr = (char*)malloc(sizeof(char)*(s + 1));
+		strcpy_s(keyManageAddr, s+1, pJsonKMA->valuestring);
+	}
+	return TRUE;
+}
+
 BOOL InitConfig()
 {
+	if (!InitSysConfig())
+	{
+		return FALSE;
+	}
 	InitializeSRWLock(&configLock);
 	GetModuleFileName(NULL, configPath, MAX_PATH);
 	WCHAR *ch = wcsrchr(configPath, '\\');
@@ -100,7 +177,7 @@ BOOL ConfigArvFilter()
 		pRule->id = pJsonRuleItem->valueint;
 		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "pubkey");
 		UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "paths");
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "path");
 		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
 		pRule->pathsLen = pathLen;
 		pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
@@ -186,7 +263,7 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen)
 	//cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
 	cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(id));
 	cJSON_AddItemToObject(item, "pubkey", cJSON_CreateString(pubkey));
-	cJSON_AddItemToObject(item, "paths", pathItem);
+	cJSON_AddItemToObject(item, "path", pathItem);
 	if (selindex >= 0)
 	{
 		cJSON_ReplaceItemInArray(jsonConfig, selindex, item);
@@ -226,7 +303,7 @@ BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB)
 		ReleaseSRWLockExclusive(&configLock);
 		return FALSE;
 	}
-	pJsonPath = cJSON_GetObjectItem(pJsonRule, "paths");
+	pJsonPath = cJSON_GetObjectItem(pJsonRule, "path");
 	int pathLen = cJSON_GetArraySize(pJsonPath);
 	for (int j = 0; j < pathLen; j++)
 	{
@@ -260,7 +337,7 @@ PSTR LoadDBConf()
 		{
 			pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
 			pJsonID = cJSON_GetObjectItem(pJsonRule, "id");
-			pJsonPath = cJSON_GetObjectItem(pJsonRule, "paths");
+			pJsonPath = cJSON_GetObjectItem(pJsonRule, "path");
 			int pathLen = cJSON_GetArraySize(pJsonPath);
 			for (int j = 0; j < pathLen; j++)
 			{
@@ -281,4 +358,180 @@ PSTR LoadDBConf()
 	ReleaseSRWLockShared(&configLock);
 	str = cJSON_Print(jsonDBConf);
 	return str;
+}
+
+
+BOOL InitDaemonConfig()
+{
+	InitializeSRWLock(&daemonLock);
+	GetModuleFileName(NULL, daemonPath, MAX_PATH);
+	WCHAR *ch = wcsrchr(daemonPath, '\\');
+	ch[1] = L'd';
+	ch[2] = L'a';
+	ch[3] = L'e';
+	ch[4] = L'm';
+	ch[5] = L'o';
+	ch[6] = L'n';
+	ch[7] = L'.';
+	ch[8] = L'j';
+	ch[9] = L's';
+	ch[10] = L'o';
+	ch[11] = L'n';
+	ch[12] = L'\0';
+	errno_t err;
+	FILE *fp;
+	int file_size;
+	if (_waccess(daemonPath, 0))
+	{
+		return TRUE;
+	}
+	err = _wfopen_s(&fp, daemonPath, L"rb");
+	if (err != 0)
+	{
+		return FALSE;
+	}
+	fseek(fp, 0, SEEK_END);
+	file_size = ftell(fp);
+	char *tmp;
+	fseek(fp, 0, SEEK_SET);
+	size_t allocSize = file_size * sizeof(char) + sizeof(char);
+	tmp = (char *)malloc(allocSize);
+	memset(tmp, 0, allocSize);
+	fread(tmp, sizeof(char), file_size, fp);
+	fclose(fp);
+	AcquireSRWLockExclusive(&daemonLock);
+	daemonConfig = cJSON_Parse(tmp);
+	free(tmp);
+	ReleaseSRWLockExclusive(&daemonLock);
+	if (daemonConfig == NULL)
+	{
+		return FALSE;
+	}
+	return TRUE;
+}
+
+BOOL UpdateDaemonConfig(PSTR daemonName, PSTR exeName, INT keyID)
+{
+	AcquireSRWLockExclusive(&daemonLock);
+	if (daemonConfig == NULL)
+	{
+		daemonConfig = cJSON_CreateArray();
+	}
+	int ruleSize = cJSON_GetArraySize(daemonConfig);
+	cJSON *pJsonRule;
+	cJSON *pJsonRuleItem;
+	cJSON *pJsonPath;
+	int selindex = -1;
+	for (int i = 0; i < ruleSize; i++)
+	{
+		pJsonRule = cJSON_GetArrayItem(daemonConfig, i);
+		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "daemonName");
+		if (strcmp(pJsonRuleItem->valuestring, daemonName)==0)
+		{
+			selindex = i;
+			break;
+		}
+	}
+	cJSON *item = cJSON_CreateObject();
+	//cJSON *pathItem = cJSON_CreateArray();
+	/*for (int j = 0; j < pathLen; j++)
+	{
+		cJSON *innerItem = cJSON_CreateObject();
+		cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(paths[j]));
+		cJSON_AddItemToObject(innerItem, "crypt", cJSON_CreateBool(isDBs[j]));
+		cJSON_AddItemToArray(pathItem, innerItem);
+	}*/
+
+	//cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
+	cJSON_AddItemToObject(item, "daemonName", cJSON_CreateString(daemonName));
+	cJSON_AddItemToObject(item, "exeName", cJSON_CreateString(exeName));
+	cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(keyID));
+	if (selindex >= 0)
+	{
+		cJSON_ReplaceItemInArray(daemonConfig, selindex, item);
+	}
+	else
+	{
+		cJSON_AddItemToArray(daemonConfig, item);
+	}
+	//ReleaseSRWLockExclusive(&daemonLock);
+
+	PWSTR dpath = NULL;
+	PWSTR epath = NULL;
+	UTF8ToUnicode(daemonName, &dpath);
+	UTF8ToUnicode(exeName, &epath);
+	errno_t err;
+	FILE *fp;
+	err = _wfopen_s(&fp, daemonPath, L"wb");
+	if (err != 0)
+	{
+		if (dpath != NULL)
+		{
+			free(dpath);
+		}
+		if (epath != NULL)
+		{
+			free(epath);
+		}
+		ReleaseSRWLockExclusive(&daemonLock);
+		return FALSE;
+	}
+	PSTR jsonstr = cJSON_Print(daemonConfig);
+	fprintf(fp, jsonstr);
+	fclose(fp);
+	if (dpath != NULL)
+	{
+		free(dpath);
+	}
+	if (epath != NULL)
+	{
+		free(epath);
+	}
+	ReleaseSRWLockExclusive(&daemonLock);
+	return TRUE;
+}
+
+PSTR PrintDaemonConfig(PSTR daemonName)
+{
+	PSTR str = NULL;
+	AcquireSRWLockShared(&daemonLock);
+	if (daemonConfig != NULL) {
+		if (daemonName == NULL)
+		{
+			str = cJSON_Print(daemonConfig);
+		}
+		else
+		{
+			int ruleSize = cJSON_GetArraySize(daemonConfig);
+			cJSON *pJsonRule;
+			cJSON *pJsonRuleItem;
+			//cJSON *pJsonPath;
+			int selindex = -1;
+			for (int i = 0; i < ruleSize; i++)
+			{
+				pJsonRule = cJSON_GetArrayItem(daemonConfig, i);
+				pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "daemonName");
+				if (_stricmp(pJsonRuleItem->valuestring, daemonName) == 0)
+				{
+					//cJSON_AddItemToObject(pJsonRule, "keyManageAddr", cJSON_CreateString(keyManageAddr));
+					str = cJSON_Print(pJsonRule);
+					//cJSON_DeleteItemFromObject(pJsonRule, "keyManageAddr");
+					break;
+				}
+			}
+		}
+	}
+	ReleaseSRWLockShared(&daemonLock);
+	return str;
+}
+
+void ClearDaemonConfig()
+{
+	AcquireSRWLockExclusive(&daemonLock);
+	if (daemonConfig != NULL)
+	{
+		cJSON_Delete(daemonConfig);
+		daemonConfig = NULL;
+	}
+	ReleaseSRWLockExclusive(&daemonLock);
 }

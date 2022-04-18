@@ -191,6 +191,15 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	{
 		WriteToLog((char*)"in InitConfig(), parse config.json failed!");
 	}
+	if (InitDaemonConfig())
+	{
+		WriteToLog((char*)"in InitDaemonConfig(), parse daemon.json success!");
+	}
+	else
+	{
+		WriteToLog((char*)"in InitDaemonConfig(), parse daemon.json failed!");
+	}
+
 	gSvcStatusHandle = RegisterServiceCtrlHandler(
 		SVC_NAME,
 		SvcCtrlHandler);

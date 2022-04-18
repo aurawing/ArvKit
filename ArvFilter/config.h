@@ -1,12 +1,10 @@
 #pragma once
 
-#include <windef.h>
-#include <ntstrsafe.h>
-
 typedef struct _PathStat {
 	volatile ULONGLONG passCounter;
 	volatile ULONGLONG blockCounter;
-
+	volatile ULONGLONG passCounterDB;
+	volatile ULONGLONG blockCounterDB;
 } PathStat, *PPathStat;
 
 typedef struct _PathEntry {
@@ -36,6 +34,8 @@ typedef struct _FilterConfig {
 	LIST_ENTRY Rules;
 	volatile ULONGLONG readCount;
 	volatile ULONGLONG writeCount;
+	volatile ULONGLONG readCountDB;
+	volatile ULONGLONG writeCountDB;
 } FilterConfig, *PFilterConfig;
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);

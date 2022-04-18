@@ -13,17 +13,7 @@ Environment:
     Kernel mode
 
 --*/
-#include <fltKernel.h>
-#include <windef.h>
-#include <ntstrsafe.h>
-#include <ntifs.h>
-#include <Wdmsec.h>
-#include <stdlib.h>
-#include <stdbool.h>
-
-#include "config.h"
-#include "crypto.h"
-#include "init.h"
+#include "pch.h"
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
 
@@ -74,8 +64,12 @@ typedef struct _RepStat { //返回统计信息
 	ULONGLONG KeyCount;
 	ULONGLONG Pass;
 	ULONGLONG Block;
+	ULONGLONG PassDB;
+	ULONGLONG BlockDB;
 	ULONGLONG Read;
 	ULONGLONG Write;
+	ULONGLONG ReadDB;
+	ULONGLONG WriteDB;
 } RepStat, *PRepStat;
 
 PFLT_PORT     gServerPort;//服务端口
@@ -457,7 +451,7 @@ VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
 	{
 		ArvAddProc(pProcHead, processID);
 		status = PsLookupProcessByProcessId((HANDLE)processID, &pProcess);
-		if (status != STATUS_SUCCESS)
+		if (!NT_SUCCESS(status))
 		{
 			break;
 		}
@@ -467,18 +461,367 @@ VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
 	}
 }
 
+NTSTATUS
+CtxCreateStreamContext(
+	_Outptr_ PCTX_STREAM_CONTEXT *StreamContext
+)
+/*++
+
+Routine Description:
+
+	This routine creates a new stream context
+
+Arguments:
+
+	StreamContext         - Returns the stream context
+
+Return Value:
+
+	Status
+
+--*/
+{
+	NTSTATUS status;
+	PCTX_STREAM_CONTEXT streamContext;
+
+	PAGED_CODE();
+
+	//
+	//  Allocate a stream context
+	//
+
+	DbgPrint("[Ctx]: Allocating stream context \n");
+
+	status = FltAllocateContext(g_minifilterHandle,
+		FLT_STREAM_CONTEXT,
+		CTX_STREAM_CONTEXT_SIZE,
+		PagedPool,
+		&streamContext);
+
+	if (!NT_SUCCESS(status)) {
+
+		DbgPrint("[Ctx]: Failed to allocate stream context with status 0x%x \n",
+			status);
+		return status;
+	}
+
+	//
+	//  Initialize the newly created context
+	//
+
+	RtlZeroMemory(streamContext, CTX_STREAM_CONTEXT_SIZE);
+
+	streamContext->Resource = CtxAllocateResource();
+	if (streamContext->Resource == NULL) {
+
+		FltReleaseContext(streamContext);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+	ExInitializeResourceLite(streamContext->Resource);
+
+	*StreamContext = streamContext;
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS
+CtxFindOrCreateStreamContext(
+	_In_ PFLT_CALLBACK_DATA Cbd,
+	_In_ BOOLEAN CreateIfNotFound,
+	_Outptr_ PCTX_STREAM_CONTEXT *StreamContext,
+	_Out_opt_ PBOOLEAN ContextCreated
+)
+/*++
+
+Routine Description:
+
+	This routine finds the stream context for the target stream.
+	Optionally, if the context does not exist this routing creates
+	a new one and attaches the context to the stream.
+
+Arguments:
+
+	Cbd                   - Supplies a pointer to the callbackData which
+							declares the requested operation.
+	CreateIfNotFound      - Supplies if the stream must be created if missing
+	StreamContext         - Returns the stream context
+	ContextCreated        - Returns if a new context was created
+
+Return Value:
+
+	Status
+
+--*/
+{
+	NTSTATUS status;
+	PCTX_STREAM_CONTEXT streamContext;
+	PCTX_STREAM_CONTEXT oldStreamContext;
+
+	PAGED_CODE();
+
+	*StreamContext = NULL;
+	if (ContextCreated != NULL) *ContextCreated = FALSE;
+
+	//
+	//  First try to get the stream context.
+	//
+
+	DbgPrint("[Ctx]: Trying to get stream context (FileObject = %p, Instance = %p)\n",
+		Cbd->Iopb->TargetFileObject,
+		Cbd->Iopb->TargetInstance);
+
+	status = FltGetStreamContext(Cbd->Iopb->TargetInstance,
+		Cbd->Iopb->TargetFileObject,
+		&streamContext);
+
+	//
+	//  If the call failed because the context does not exist
+	//  and the user wants to creat a new one, the create a
+	//  new context
+	//
+
+	if (!NT_SUCCESS(status) &&
+		(status == STATUS_NOT_FOUND) &&
+		CreateIfNotFound) {
+
+
+		//
+		//  Create a stream context
+		//
+
+		DbgPrint("[Ctx]: Creating stream context (FileObject = %p, Instance = %p)\n",
+			Cbd->Iopb->TargetFileObject,
+			Cbd->Iopb->TargetInstance);
+
+		status = CtxCreateStreamContext(&streamContext);
+
+		if (!NT_SUCCESS(status)) {
+
+			DbgPrint("[Ctx]: Failed to create stream context with status 0x%x. (FileObject = %p, Instance = %p)\n",
+				status,
+				Cbd->Iopb->TargetFileObject,
+				Cbd->Iopb->TargetInstance);
+
+			return status;
+		}
+
+
+		//
+		//  Set the new context we just allocated on the file object
+		//
+
+		DbgPrint("[Ctx]: Setting stream context %p (FileObject = %p, Instance = %p)\n",
+			streamContext,
+			Cbd->Iopb->TargetFileObject,
+			Cbd->Iopb->TargetInstance);
+
+		status = FltSetStreamContext(Cbd->Iopb->TargetInstance,
+			Cbd->Iopb->TargetFileObject,
+			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
+			streamContext,
+			&oldStreamContext);
+
+		if (!NT_SUCCESS(status)) {
+
+			DbgPrint("[Ctx]: Failed to set stream context with status 0x%x. (FileObject = %p, Instance = %p)\n",
+				status,
+				Cbd->Iopb->TargetFileObject,
+				Cbd->Iopb->TargetInstance);
+			//
+			//  We release the context here because FltSetStreamContext failed
+			//
+			//  If FltSetStreamContext succeeded then the context will be returned
+			//  to the caller. The caller will use the context and then release it
+			//  when he is done with the context.
+			//
+
+			DbgPrint("[Ctx]: Releasing stream context %p (FileObject = %p, Instance = %p)\n",
+				streamContext,
+				Cbd->Iopb->TargetFileObject,
+				Cbd->Iopb->TargetInstance);
+
+			FltReleaseContext(streamContext);
+
+			if (status != STATUS_FLT_CONTEXT_ALREADY_DEFINED) {
+
+				//
+				//  FltSetStreamContext failed for a reason other than the context already
+				//  existing on the stream. So the object now does not have any context set
+				//  on it. So we return failure to the caller.
+				//
+
+				DbgPrint("[Ctx]: Failed to set stream context with status 0x%x != STATUS_FLT_CONTEXT_ALREADY_DEFINED. (FileObject = %p, Instance = %p)\n",
+					status,
+					Cbd->Iopb->TargetFileObject,
+					Cbd->Iopb->TargetInstance);
+
+				return status;
+			}
+
+			//
+			//  Race condition. Someone has set a context after we queried it.
+			//  Use the already set context instead
+			//
+
+			DbgPrint("[Ctx]: Stream context already defined. Retaining old stream context %p (FileObject = %p, Instance = %p)\n",
+				oldStreamContext,
+				Cbd->Iopb->TargetFileObject,
+				Cbd->Iopb->TargetInstance);
+
+			//
+			//  Return the existing context. Note that the new context that we allocated has already been
+			//  realeased above.
+			//
+
+			streamContext = oldStreamContext;
+			status = STATUS_SUCCESS;
+
+		}
+		else {
+
+			if (ContextCreated != NULL) *ContextCreated = TRUE;
+		}
+	}
+
+	*StreamContext = streamContext;
+
+	return status;
+}
+
+//
+//  Support Routines
+//
+
+_At_(String->Length, _Out_range_(== , 0))
+_At_(String->MaximumLength, _In_)
+_At_(String->Buffer, _Pre_maybenull_ _Post_notnull_ _Post_writable_byte_size_(String->MaximumLength))
+NTSTATUS
+CtxAllocateUnicodeString(
+	_Out_ PUNICODE_STRING String
+)
+/*++
+
+Routine Description:
+
+	This routine allocates a unicode string
+
+Arguments:
+
+	String - supplies the size of the string to be allocated in the MaximumLength field
+			 return the unicode string
+
+Return Value:
+
+	STATUS_SUCCESS                  - success
+	STATUS_INSUFFICIENT_RESOURCES   - failure
+
+--*/
+{
+	PAGED_CODE();
+
+	String->Buffer = ExAllocatePoolWithTag(PagedPool,
+		String->MaximumLength,
+		CTX_STRING_TAG);
+
+	if (String->Buffer == NULL) {
+
+		DbgPrint("[Ctx]: Failed to allocate unicode string of size 0x%x\n",
+			String->MaximumLength);
+
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	String->Length = 0;
+
+	return STATUS_SUCCESS;
+}
+
+_At_(String->Length, _Out_range_(== , 0))
+_At_(String->MaximumLength, _Out_range_(== , 0))
+_At_(String->Buffer, _Pre_notnull_ _Post_null_)
+VOID
+CtxFreeUnicodeString(
+	_Pre_notnull_ PUNICODE_STRING String
+)
+/*++
+
+Routine Description:
+
+	This routine frees a unicode string
+
+Arguments:
+
+	String - supplies the string to be freed
+
+Return Value:
+
+	None
+
+--*/
+{
+	PAGED_CODE();
+
+	ExFreePoolWithTag(String->Buffer,
+		CTX_STRING_TAG);
+
+	String->Length = String->MaximumLength = 0;
+	String->Buffer = NULL;
+}
+
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
 )
 {
-	if (FltObjects->FileObject == NULL) {
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	PCTX_STREAM_CONTEXT streamContext = NULL;
+	NTSTATUS status;
+	BOOLEAN streamContextCreated;
+
+	if (!NT_SUCCESS(Data->IoStatus.Status)) {
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		goto CtxPreReadCleanup;
 	}
+
+	if (FltObjects->FileObject == NULL) {
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		goto CtxPreReadCleanup;
+	}
+
+	status = CtxFindOrCreateStreamContext(Data,
+		FALSE,     // do not create if one does not exist
+		&streamContext,
+		&streamContextCreated);
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  This failure will most likely be because stream contexts are not supported
+		//  on the object we are trying to assign a context to or the object is being 
+		//  deleted
+		//  
+
+		DbgPrint("[Ctx]: CtxPostRead -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
+				Data,
+				FltObjects->FileObject);
+
+		goto CtxPreReadCleanup;
+	}
+
+	CtxAcquireResourceShared(streamContext->Resource);
+	if (streamContext->UnderDBPath)
+	{
+		InterlockedIncrement64(&filterConfig.readCountDB);
+	}
+	CtxReleaseResource(streamContext->Resource);
+
 	ExAcquireResourceSharedLite(&HashResource, TRUE);
 	InterlockedIncrement64(&filterConfig.readCount);
 	ExReleaseResourceLite(&HashResource);
+
+CtxPreReadCleanup:
+	if (streamContext != NULL) {
+		FltReleaseContext(streamContext);
+	}
 	return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
@@ -488,38 +831,54 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
 )
 {
-	if (FltObjects->FileObject == NULL) {
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	PCTX_STREAM_CONTEXT streamContext = NULL;
+	NTSTATUS status;
+	BOOLEAN streamContextCreated;
+
+	if (!NT_SUCCESS(Data->IoStatus.Status)) {
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		goto CtxPreWriteCleanup;
 	}
+
+	if (FltObjects->FileObject == NULL) {
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		goto CtxPreWriteCleanup;
+	}
+
+	status = CtxFindOrCreateStreamContext(Data,
+		FALSE,     // do not create if one does not exist
+		&streamContext,
+		&streamContextCreated);
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  This failure will most likely be because stream contexts are not supported
+		//  on the object we are trying to assign a context to or the object is being 
+		//  deleted
+		//  
+
+		DbgPrint("[Ctx]: CtxPreWrite -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
+			Data,
+			FltObjects->FileObject);
+
+		goto CtxPreWriteCleanup;
+	}
+
+	CtxAcquireResourceShared(streamContext->Resource);
+	if (streamContext->UnderDBPath)
+	{
+		InterlockedIncrement64(&filterConfig.writeCountDB);
+	}
+	CtxReleaseResource(streamContext->Resource);
+
 	ExAcquireResourceSharedLite(&HashResource, TRUE);
 	InterlockedIncrement64(&filterConfig.writeCount);
 	ExReleaseResourceLite(&HashResource);
 
-	//FILE_BASIC_INFORMATION basicInfo;
-	//ULONG procID = FltGetRequestorProcessId(Data);
-	//NTSTATUS status = FltQueryInformationFile(FltObjects->Instance,
-	//	FltObjects->FileObject,
-	//	&basicInfo,
-	//	sizeof(FILE_BASIC_INFORMATION),
-	//	FileBasicInformation,
-	//	NULL);
-
-	//if (NT_SUCCESS(status)) {
-	//	if ((basicInfo.FileAttributes & FILE_ATTRIBUTE_SYSTEM) == FILE_ATTRIBUTE_SYSTEM)
-	//	{
-	//		DbgPrint("[FsFilter:create]filtering system file: %d - %wZ\n", procID, &Data->Iopb->TargetFileObject->FileName);
-	//		if (procID != 4)
-	//		{
-	//			return FLT_PREOP_COMPLETE;
-	//		}
-	//	}
-	//}
-	//else
-	//{
-	//	DbgPrint("[FsFilter:create]filtering system file failed: %d - %wZ\n", procID, &Data->Iopb->TargetFileObject->FileName);
-	//	//return FLT_PREOP_COMPLETE;;
-	//}
-
+CtxPreWriteCleanup:
+	if (streamContext != NULL) {
+		FltReleaseContext(streamContext);
+	}
 	return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
@@ -532,7 +891,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	//
 	// Pre-create callback to get file info during creation or opening
 	//
-	NTSTATUS status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	if (FltObjects->FileObject == NULL) {
 		return status;
 	}
@@ -552,29 +911,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	}
 	ULONG procID = FltGetRequestorProcessId(Data);
 	WCHAR SystemRoot[] = { 'C', ':', '\\' };
-	//if (Data && Data->Iopb && (Data->Iopb->MajorFunction == IRP_MJ_CREATE))
-	//{
-	//	// Get create disposition
-	//	ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-
-	//	// Check if new file is read or not
-	//	/*int isReadFile = ((FILE_SUPERSEDE == createDisposition)
-	//		|| (FILE_CREATE == createDisposition)
-	//		|| (FILE_OPEN_IF == createDisposition)
-	//		|| (FILE_OVERWRITE == createDisposition)
-	//		|| (FILE_OVERWRITE_IF == createDisposition));*/
-	//	if (FILE_OPEN == createDisposition)
-	//	{
-	//		DbgPrint("[FsFilter:open]%d - %wZ\n", procID, &Data->Iopb->TargetFileObject->FileName);
-	//		if ((Data->Iopb->TargetFileObject->FileName.Length >= 3 * sizeof(wchar_t)) &&
-	//			(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0))
-	//		{
-	//			return status;
-	//		}
-	//	}
-	//}
-
-
 	WCHAR LoginPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'i', 'n', '?', '\\' };
 	WCHAR LogoutPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'o', 't', '?', '\\' };
 	PEPROCESS pProcess = NULL;
@@ -618,7 +954,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			if (Data->Iopb->TargetFileObject->FileName.Buffer[a] != L'\\')
 			{
-				if (Data->Iopb->TargetFileObject->FileName.Buffer[a]<256)
+				if (Data->Iopb->TargetFileObject->FileName.Buffer[a] < 256)
 				{
 					logintag[a] = Data->Iopb->TargetFileObject->FileName.Buffer[a];
 				}
@@ -688,7 +1024,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			return FLT_PREOP_COMPLETE;
 		}
-		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(PagedPool, wPubKey->Length/sizeof(wchar_t) + 1, 'LGI');
+		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(PagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
 		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
 		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
 		{
@@ -812,7 +1148,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 							k++;
 						}
 					}
-
+					BOOL underDBPath = FALSE;
 					BOOL flag = FALSE;
 					PRuleEntry pRuleEntry = { 0 };
 					PPathEntry pPathEntry = { 0 };
@@ -829,10 +1165,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 							{
 								USHORT fpLen = fullPath.Length;
 								fullPath.Length = pPathEntry->Path.Length;
-								if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE)==0)
+								if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0)
 								{
 									fullPath.Length = fpLen;
 									flag = TRUE;
+									if (pPathEntry->isDB)
+									{
+										underDBPath = TRUE;
+									}
 									goto out1;
 								}
 								fullPath.Length = fpLen;
@@ -893,11 +1233,19 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									{
 										DbgPrint("[FsFilter:create]allowed system process under system device: %d(%s) - %wZ\n", procID, processName, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.passCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+										}
 									}
 									else
 									{
 										DbgPrint("[FsFilter:create]unallowed process under system device: %d(%s) - %wZ\n", procID, processName, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
+										}
 										Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 										Data->IoStatus.Information = 0;
 										status = FLT_PREOP_COMPLETE;
@@ -909,11 +1257,19 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									{
 										DbgPrint("[FsFilter:create]allowed system process(readonly): %d(%s) - %wZ\n", procID, processName, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.passCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+										}
 									}
 									else
 									{
 										DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, processName, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
+										}
 										Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 										Data->IoStatus.Information = 0;
 										status = FLT_PREOP_COMPLETE;
@@ -927,10 +1283,18 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									if (ProcAllowed(procID))
 									{
 										InterlockedIncrement64(&pPathEntry->stat.passCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+										}
 									}
 									else
 									{
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
+										}
 										Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 										Data->IoStatus.Information = 0;
 										status = FLT_PREOP_COMPLETE;
@@ -944,6 +1308,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 										// deleting a file we need to action
 										if (((FILE_DISPOSITION_INFORMATION*)Data->Iopb->Parameters.SetFileInformation.InfoBuffer)->DeleteFile) {
 											InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+											if (underDBPath)
+											{
+												InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
+											}
 											Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 											Data->IoStatus.Information = 0;
 											status = FLT_PREOP_COMPLETE;
@@ -953,6 +1321,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									case 65:
 										// Process the request according to our needs e.g copy the file
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+										if (underDBPath)
+										{
+											InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
+										}
 										Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 										Data->IoStatus.Information = 0;
 										status = FLT_PREOP_COMPLETE;
@@ -973,6 +1345,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						else
 						{
 							InterlockedIncrement64(&pPathEntry->stat.passCounter);
+							if (underDBPath)
+							{
+								InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+							}
 							//DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
 						}
 						ArvFreeProcs(&procHead);
@@ -1006,12 +1382,501 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	{
 		ObDereferenceObject(pProcess);
 	}
-	if (status != FLT_PREOP_COMPLETE)
+	/*if (status != FLT_PREOP_COMPLETE)
 	{
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	}*/
+	if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
+	{
+		status = FLT_PREOP_SYNCHRONIZE;
 	}
 	return status;
 }
+
+FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
+	_Inout_ PFLT_CALLBACK_DATA Cbd,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Inout_opt_ PVOID CbdContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+)
+{
+	PCTX_STREAM_CONTEXT streamContext = NULL;
+	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
+	UNICODE_STRING fullPath = { 0 };
+	UNICODE_STRING dosName = { 0 };
+	size_t fullLen = 0;
+
+	NTSTATUS status;
+	BOOLEAN streamContextCreated;
+
+
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(Flags);
+	UNREFERENCED_PARAMETER(CbdContext);
+
+	PAGED_CODE();
+
+	DbgPrint("[Ctx]: CtxPostCreate -> Enter (Cbd = %p, FileObject = %p)\n",
+		Cbd,
+		FltObjects->FileObject);
+
+	//
+	// Initialize defaults
+	//
+
+	status = STATUS_SUCCESS;
+
+	//
+	//  If the Create has failed, do nothing
+	//
+
+	if (!NT_SUCCESS(Cbd->IoStatus.Status)) {
+
+		goto CtxPostCreateCleanup;
+	}
+
+
+	//
+	// Get the file name
+	//
+
+	status = FltGetFileNameInformation(Cbd,
+		FLT_FILE_NAME_NORMALIZED |
+		FLT_FILE_NAME_QUERY_DEFAULT,
+		&nameInfo);
+
+	if (!NT_SUCCESS(status)) {
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to get name information (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+	status = FltParseFileNameInformation(nameInfo);
+
+	if (!NT_SUCCESS(status))
+	{
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to parse file name (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+	if (!(nameInfo->Volume).Buffer)
+	{
+		DbgPrint("[Ctx]: CtxPostCreate -> No volume parsed (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+	status = MyRtlVolumeDeviceToDosName(&(nameInfo->Volume), &dosName);
+
+	if (!NT_SUCCESS(status))
+	{
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to parse volume name (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+	fullLen = dosName.Length + Cbd->Iopb->TargetFileObject->FileName.Length;
+	fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+	fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
+	UINT i = 0, j = 0, k = 0;
+	for (i = 0; i < fullLen / sizeof(wchar_t); i++)
+	{
+		if (i < dosName.Length / sizeof(wchar_t))
+		{
+			fullPath.Buffer[i] = dosName.Buffer[j];
+			j++;
+		}
+		else
+		{
+			fullPath.Buffer[i] = Cbd->Iopb->TargetFileObject->FileName.Buffer[k];
+			k++;
+		}
+	}
+
+	BOOL flag = FALSE;
+	PRuleEntry pRuleEntry = { 0 };
+	PPathEntry pPathEntry = { 0 };
+	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+	while (pListEntry != &filterConfig.Rules)
+	{
+		pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		PLIST_ENTRY pListEntry2 = pRuleEntry->Dirs.Flink;
+		while (pListEntry2 != &pRuleEntry->Dirs)
+		{
+			pPathEntry = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
+			if (pPathEntry->Path.Length <= fullPath.Length)
+			{
+				USHORT fpLen = fullPath.Length;
+				fullPath.Length = pPathEntry->Path.Length;
+				if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0 && pPathEntry->isDB)
+				{
+					fullPath.Length = fpLen;
+					flag = TRUE;
+					goto out1;
+				}
+				fullPath.Length = fpLen;
+			}
+			pListEntry2 = pListEntry2->Flink;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+out1:
+	ExReleaseResourceLite(&HashResource);
+
+	//
+	// Find or create a stream context
+	//
+
+	status = CtxFindOrCreateStreamContext(Cbd,
+		TRUE,
+		&streamContext,
+		&streamContextCreated);
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  This failure will most likely be because stream contexts are not supported
+		//  on the object we are trying to assign a context to or the object is being 
+		//  deleted
+		//  
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to find or create stream context (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+	DbgPrint("[Ctx]: CtxPostCreate -> Getting/Creating stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
+		&nameInfo->Name,
+		Cbd,
+		FltObjects->FileObject,
+		streamContext,
+		streamContextCreated);
+
+	//
+	//  Acquire write acccess to the context
+	//
+
+	CtxAcquireResourceExclusive(streamContext->Resource);
+
+	//
+	//  Increment the create count
+	//
+
+	streamContext->UnderDBPath = flag;
+
+
+	DbgPrint("[Ctx]: CtxPostCreate -> Stream context info for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
+		&nameInfo->Name,
+		Cbd,
+		FltObjects->FileObject,
+		streamContext);
+
+	//
+	//  Relinquish write acccess to the context
+	//
+
+	CtxReleaseResource(streamContext->Resource);
+
+	//
+	//  Quit on failure after we have given up
+	//  the resource
+	//
+
+	if (!NT_SUCCESS(status)) {
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to update name in stream context for file %wZ (Cbd = %p, FileObject = %p)\n",
+			&nameInfo->Name,
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostCreateCleanup;
+	}
+
+
+CtxPostCreateCleanup:
+
+
+	//
+	// Release the references we have acquired
+	//    
+
+	if (nameInfo != NULL) {
+
+		FltReleaseFileNameInformation(nameInfo);
+	}
+
+	if (streamContext != NULL) {
+
+		FltReleaseContext(streamContext);
+	}
+
+	ArvFreeUnicodeString(&dosName, 'SOD');
+	ArvFreeUnicodeString(&fullPath, 'POC');
+
+	DbgPrint("[Ctx]: CtxPostCreate -> Exit (Cbd = %p, FileObject = %p, Status = 0x%x)\n",
+		Cbd,
+		FltObjects->FileObject,
+		Cbd->IoStatus.Status);
+
+	return FLT_POSTOP_FINISHED_PROCESSING;
+}
+
+FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationSetInfo(
+	_Inout_ PFLT_CALLBACK_DATA Cbd,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Inout_opt_ PVOID CbdContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+)
+{
+	PCTX_STREAM_CONTEXT streamContext = NULL;
+	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
+	UNICODE_STRING fullPath = { 0 };
+	UNICODE_STRING dosName = { 0 };
+	size_t fullLen = 0;
+
+	NTSTATUS status;
+	BOOLEAN streamContextCreated;
+
+	UNREFERENCED_PARAMETER(Flags);
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CbdContext);
+
+	//
+	//  The pre-operation callback will return FLT_PREOP_SYNCHRONIZE if it needs a 
+	//  post operation callback. In this case, the Filter Manager will call the 
+	//  minifilter's post-operation callback in the context of the pre-operation 
+	//  thread, at IRQL <= APC_LEVEL. This allows the post-operation code to be
+	//  pagable and also allows it to access paged data
+	//  
+
+	PAGED_CODE();
+
+	DbgPrint("[Ctx]: CtxPostSetInfo -> Enter (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+
+	//
+	// Initialize defaults
+	//
+
+	status = STATUS_SUCCESS;
+
+	//
+	//  If the SetInfo has failed, do nothing
+	//
+
+	if (!NT_SUCCESS(Cbd->IoStatus.Status)) {
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+
+	//
+	//  Get the instance context for the target instance
+	//
+
+	DbgPrint("[Ctx]: CtxPostSetInfo -> Trying to get instance context (TargetInstance = %p, Cbd = %p, FileObject = %p)\n",
+			Cbd->Iopb->TargetInstance,
+			Cbd,
+			FltObjects->FileObject);
+
+
+	//
+	// Get the directory name
+	//
+
+	status = FltGetFileNameInformation(Cbd,
+		FLT_FILE_NAME_NORMALIZED |
+		FLT_FILE_NAME_QUERY_DEFAULT,
+		&nameInfo);
+
+	if (!NT_SUCCESS(status)) {
+
+		DbgPrint("[Ctx]: CtxPostSetInfo -> Failed to get file name information (Cbd = %p, FileObject = %p)\n",
+				Cbd,
+				FltObjects->FileObject);
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+	status = FltParseFileNameInformation(nameInfo);
+
+	if (!NT_SUCCESS(status))
+	{
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to parse file name (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+	if (!(nameInfo->Volume).Buffer)
+	{
+		DbgPrint("[Ctx]: CtxPostCreate -> No volume parsed (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+	status = MyRtlVolumeDeviceToDosName(&(nameInfo->Volume), &dosName);
+
+	if (!NT_SUCCESS(status))
+	{
+
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to parse volume name (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+	fullLen = dosName.Length + Cbd->Iopb->TargetFileObject->FileName.Length;
+	fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+	fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
+	UINT i = 0, j = 0, k = 0;
+	for (i = 0; i < fullLen / sizeof(wchar_t); i++)
+	{
+		if (i < dosName.Length / sizeof(wchar_t))
+		{
+			fullPath.Buffer[i] = dosName.Buffer[j];
+			j++;
+		}
+		else
+		{
+			fullPath.Buffer[i] = Cbd->Iopb->TargetFileObject->FileName.Buffer[k];
+			k++;
+		}
+	}
+
+	BOOL flag = FALSE;
+	PRuleEntry pRuleEntry = { 0 };
+	PPathEntry pPathEntry = { 0 };
+	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+	while (pListEntry != &filterConfig.Rules)
+	{
+		pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		PLIST_ENTRY pListEntry2 = pRuleEntry->Dirs.Flink;
+		while (pListEntry2 != &pRuleEntry->Dirs)
+		{
+			pPathEntry = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
+			if (pPathEntry->Path.Length <= fullPath.Length)
+			{
+				USHORT fpLen = fullPath.Length;
+				fullPath.Length = pPathEntry->Path.Length;
+				if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0 && pPathEntry->isDB)
+				{
+					fullPath.Length = fpLen;
+					flag = TRUE;
+					goto out1;
+				}
+				fullPath.Length = fpLen;
+			}
+			pListEntry2 = pListEntry2->Flink;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+out1:
+	ExReleaseResourceLite(&HashResource);
+
+
+	//
+	// Get the stream context
+	//
+
+	status = CtxFindOrCreateStreamContext(Cbd,
+		FALSE,     // do not create if one does not exist
+		&streamContext,
+		&streamContextCreated);
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  This failure will most likely be because stream contexts are not supported
+		//  on the object we are trying to assign a context to or the object is being 
+		//  deleted
+		//  
+
+		DbgPrint("[Ctx]: CtxPostSetInfo -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
+				Cbd,
+				FltObjects->FileObject);
+
+		goto CtxPostSetInfoCleanup;
+	}
+
+	DbgPrint("[Ctx]: CtxPostSetInfo -> Getting stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
+			&nameInfo->Name,
+			Cbd,
+			FltObjects->FileObject,
+			streamContext,
+			streamContextCreated);
+
+	//
+	//  Acquire write acccess to the context
+	//
+
+	CtxAcquireResourceExclusive(streamContext->Resource);
+
+	streamContext->UnderDBPath = flag;
+
+	DbgPrint("[Ctx]: CtxPostSetInfo -> Old info in stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
+			&nameInfo->Name,
+			Cbd,
+			FltObjects->FileObject,
+			streamContext);
+
+
+	//
+	//  Relinquish write acccess to the context
+	//
+
+	CtxReleaseResource(streamContext->Resource);
+
+
+CtxPostSetInfoCleanup:
+
+
+	//
+	// Release the references we have acquired
+	//    
+
+
+	if (streamContext != NULL) {
+
+		FltReleaseContext(streamContext);
+	}
+
+	if (nameInfo != NULL) {
+
+		FltReleaseFileNameInformation(nameInfo);
+	}
+
+	ArvFreeUnicodeString(&dosName, 'SOD');
+	ArvFreeUnicodeString(&fullPath, 'POC');
+
+	DbgPrint("[Ctx]: CtxPostSetInfo -> Exit (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+
+	return FLT_POSTOP_FINISHED_PROCESSING;
+}
+
 
 NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 {
@@ -1063,27 +1928,70 @@ NTSTATUS FLTAPI InstanceQueryTeardownCallback(
 	return STATUS_SUCCESS;
 }
 
+VOID
+CtxContextCleanup(
+	_In_ PFLT_CONTEXT Context,
+	_In_ FLT_CONTEXT_TYPE ContextType
+)
+{
+	PCTX_STREAM_CONTEXT streamContext;
+
+	PAGED_CODE();
+
+	switch (ContextType) {
+
+	case FLT_STREAM_CONTEXT:
+
+		streamContext = (PCTX_STREAM_CONTEXT)Context;
+
+		DbgPrint("[Ctx]: Cleaning up stream context %p: %d\n",
+				streamContext, 
+				&streamContext->UnderDBPath);
+
+		//
+		//  Delete the resource and memory the memory allocated for the resource
+		//
+
+		if (streamContext->Resource != NULL) {
+
+			ExDeleteResourceLite(streamContext->Resource);
+			CtxFreeResource(streamContext->Resource);
+		}
+
+		if (streamContext->UnderDBPath ) {
+
+			streamContext->UnderDBPath = FALSE;
+		}
+
+		DbgPrint("[Ctx]: Stream context cleanup complete.\n");
+
+		break;
+
+	}
+
+}
+
 //
 	// Constant FLT_REGISTRATION structure for our filter.
 	// This initializes the callback routines our filter wants to register for.
 	//
-CONST FLT_OPERATION_REGISTRATION g_callbacks[] =
+FLT_OPERATION_REGISTRATION g_callbacks[] =
 {
 	{
 		IRP_MJ_CREATE,
-		0,
+		FLTFL_OPERATION_REGISTRATION_SKIP_PAGING_IO,
 		PreOperationCreate,
-		0
+		PostOperationCreate
 	},
 	{
 		IRP_MJ_READ,
-		0,
+		FLTFL_OPERATION_REGISTRATION_SKIP_PAGING_IO,
 		PreOperationRead,
 		0
 	},
 	{
 		IRP_MJ_WRITE,
-		0,
+		FLTFL_OPERATION_REGISTRATION_SKIP_PAGING_IO,
 		PreOperationWrite,
 		0
 	},
@@ -1091,10 +1999,22 @@ CONST FLT_OPERATION_REGISTRATION g_callbacks[] =
 		IRP_MJ_SET_INFORMATION,
 		FLTFL_OPERATION_REGISTRATION_SKIP_PAGING_IO,
 		PreOperationCreate,
-		0
+		PostOperationSetInfo
 	},
 	{ IRP_MJ_OPERATION_END }
 };
+
+const FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
+
+	{ FLT_STREAM_CONTEXT,
+	  0,
+	  CtxContextCleanup,
+	  CTX_STREAM_CONTEXT_SIZE,
+	  CTX_STREAM_CONTEXT_TAG },
+
+	{ FLT_CONTEXT_END }
+};
+
 
 //
 // The FLT_REGISTRATION structure provides information about a file system minifilter to the filter manager.
@@ -1104,7 +2024,7 @@ CONST FLT_REGISTRATION g_filterRegistration =
 	sizeof(FLT_REGISTRATION),      //  Size
 	FLT_REGISTRATION_VERSION,      //  Version
 	0,                             //  Flags
-	NULL,                          //  Context registration
+	ContextRegistration,                          //  Context registration
 	g_callbacks,                   //  Operation callbacks
 	InstanceFilterUnloadCallback,  //  FilterUnload
 	InstanceSetupCallback,         //  InstanceSetup
@@ -1274,6 +2194,8 @@ MiniMessage(
 				ULONGLONG keyCount = 0;
 				ULONGLONG passTotal = 0;
 				ULONGLONG blockTotal = 0;
+				ULONGLONG passTotalDB = 0;
+				ULONGLONG blockTotalDB = 0;
 				while (pListEntry != &filterConfig.Rules)
 				{
 					keyCount++;
@@ -1285,6 +2207,8 @@ MiniMessage(
 						//Sha256UnicodeString(&pPathEntry->Path, pStats[i].SHA256);
 						passTotal += pPathEntry->stat.passCounter;
 						blockTotal += pPathEntry->stat.blockCounter;
+						passTotalDB += pPathEntry->stat.passCounterDB;
+						blockTotalDB += pPathEntry->stat.blockCounterDB;
 						i++;
 						pListEntry2 = pListEntry2->Flink;
 					}
@@ -1293,8 +2217,12 @@ MiniMessage(
 				pStats->KeyCount = keyCount;
 				pStats->Block = blockTotal;
 				pStats->Pass = passTotal;
+				pStats->BlockDB = blockTotalDB;
+				pStats->PassDB = passTotalDB;
 				pStats->Read = filterConfig.readCount;
 				pStats->Write = filterConfig.writeCount;
+				pStats->ReadDB = filterConfig.readCountDB;
+				pStats->WriteDB = filterConfig.writeCountDB;
 				ExReleaseResourceLite(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat);
 				break;

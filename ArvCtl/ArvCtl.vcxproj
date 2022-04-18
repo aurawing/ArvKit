@@ -164,7 +164,7 @@
   <ItemGroup>
     <ClCompile Include="ArvCtl.cpp" />
     <ClCompile Include="config.cpp" />
-    <ClCompile Include="cSJON.c" />
+    <ClCompile Include="cJSON.c" />
     <ClCompile Include="libbase58\base58.cpp" />
     <ClCompile Include="libripemd160\memzero.cpp" />
     <ClCompile Include="libripemd160\ripemd160.cpp" />

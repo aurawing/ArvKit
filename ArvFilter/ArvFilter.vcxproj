@@ -208,10 +208,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h" />
-    <ClInclude Include="context.c" />
-    <ClInclude Include="context.h" />
     <ClInclude Include="crypto.h" />
     <ClInclude Include="init.h" />
+    <ClInclude Include="pch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

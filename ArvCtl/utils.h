@@ -48,8 +48,12 @@ typedef struct _RepStat { //返回统计信息
 	ULONGLONG KeyCount;
 	ULONGLONG Pass;
 	ULONGLONG Block;
+	ULONGLONG PassDB;
+	ULONGLONG BlockDB;
 	ULONGLONG Read;
 	ULONGLONG Write;
+	ULONGLONG ReadDB;
+	ULONGLONG WriteDB;
 } RepStat, *PRepStat;
 
 typedef struct _ArvDiskInfo {
@@ -68,3 +72,4 @@ VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
 //VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);
 void GetDiskInfo(PArvDiskInfo diskInfo);
 bool VerifyPublicKey(PSTR pubkey58);
+int CopyByBlock(const TCHAR *dest_file_name, const TCHAR *src_file_name);

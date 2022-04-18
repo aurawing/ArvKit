@@ -196,3 +196,29 @@ bool VerifyPublicKey(PSTR pubkey58)
 	}
 	return true;
 }
+int CopyByBlock(const TCHAR *dest_file_name, const TCHAR *src_file_name)
+{
+	FILE *fp1, *fp2;
+	_wfopen_s(&fp1, dest_file_name, L"wb");
+	_wfopen_s(&fp2, src_file_name, L"rb");
+	if (fp1 == NULL) {
+		perror("fp1:");
+		return -1;
+	}
+	if (fp2 == NULL) {
+		perror("fp2:");
+		return -1;
+	}
+	void *buffer = (void *)malloc(1024);
+	int cnt = 0;
+	while (1) {
+		int op = fread(buffer, 1, 1024, fp2);
+		if (op <= 0) break;
+		fwrite(buffer, 1, 1024, fp1);
+		cnt++;
+	}
+	free(buffer);
+	fclose(fp1);
+	fclose(fp2);
+	return cnt;
+}
