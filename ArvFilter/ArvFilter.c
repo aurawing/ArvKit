@@ -913,8 +913,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	WCHAR SystemRoot[] = { 'C', ':', '\\' };
 	WCHAR LoginPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'i', 'n', '?', '\\' };
 	WCHAR LogoutPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'o', 't', '?', '\\' };
-	PEPROCESS pProcess = NULL;
-	NTSTATUS status2 = STATUS_SUCCESS;
+	//PEPROCESS pProcess = NULL;
+	//NTSTATUS status2 = STATUS_SUCCESS;
 
 	//PEPROCESS pProcess = NULL;
 	//status = PsLookupProcessByProcessId((HANDLE)procID, &pProcess);
@@ -1107,17 +1107,21 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	if (filterConfig.Rules.Flink == &filterConfig.Rules)
 	{
 		ExReleaseResourceLite(&HashResource);
+		if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
+		{
+			status = FLT_PREOP_SYNCHRONIZE;
+		}
 		return status;
 	}
 	__try
 	{
-		status2 = PsLookupProcessByProcessId((HANDLE)procID, &pProcess);
+		/*status2 = PsLookupProcessByProcessId((HANDLE)procID, &pProcess);
 		char *processName = "null";
 		if (status2 == STATUS_SUCCESS)
 		{
 			processName = PsGetProcessImageFileName(pProcess);
-		}
-
+		}*/
+		
 		status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &nameInfo);
 		if (NT_SUCCESS(status))
 		{
@@ -1152,7 +1156,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					BOOL flag = FALSE;
 					PRuleEntry pRuleEntry = { 0 };
 					PPathEntry pPathEntry = { 0 };
-					//ExAcquireResourceSharedLite(&HashResource, TRUE);
 					PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
 					while (pListEntry != &filterConfig.Rules)
 					{
@@ -1231,7 +1234,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 								{
 									if (ProcAllowed(procID) || FILE_OPEN == createDisposition)
 									{
-										DbgPrint("[FsFilter:create]allowed system process under system device: %d(%s) - %wZ\n", procID, processName, fullPath);
+										DbgPrint("[FsFilter:create]allowed system process under system device: %d - %wZ\n", procID, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.passCounter);
 										if (underDBPath)
 										{
@@ -1240,7 +1243,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									}
 									else
 									{
-										DbgPrint("[FsFilter:create]unallowed process under system device: %d(%s) - %wZ\n", procID, processName, fullPath);
+										DbgPrint("[FsFilter:create]unallowed process under system device: %d - %wZ\n", procID, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
 										if (underDBPath)
 										{
@@ -1255,7 +1258,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 								{
 									if (ProcAllowed(procID) && FILE_OPEN == createDisposition)
 									{
-										DbgPrint("[FsFilter:create]allowed system process(readonly): %d(%s) - %wZ\n", procID, processName, fullPath);
+										DbgPrint("[FsFilter:create]allowed system process(readonly): %d - %wZ\n", procID, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.passCounter);
 										if (underDBPath)
 										{
@@ -1264,7 +1267,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 									}
 									else
 									{
-										DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, processName, fullPath);
+										DbgPrint("[FsFilter:create]unallowed process: %d - %wZ\n", procID, fullPath);
 										InterlockedIncrement64(&pPathEntry->stat.blockCounter);
 										if (underDBPath)
 										{
@@ -1356,6 +1359,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					else
 					{
 						//DbgPrint("[FsFilter:create]unfiltered path: %d - %wZ\n", procID, fullPath);
+						//TODO: Î´ÃüÖÐÄ¿Â¼£¬¿É¶Á
 					}
 				}
 				else
@@ -1369,19 +1373,24 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			DbgPrint("[FsFilter:create]parse name failed: %d - %wZ\n", procID, Data->Iopb->TargetFileObject->FileName);
 		}
-
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
 		DbgPrint("[FsFilter:create]PreOperationWrite EXCEPTION_EXECUTE_HANDLER: %d - %wZ - %d\n", procID, Data->Iopb->TargetFileObject->FileName, GetExceptionCode());
 	}
 	ExReleaseResourceLite(&HashResource);
-	ArvFreeUnicodeString(&dosName, 'SOD');
-	ArvFreeUnicodeString(&fullPath, 'POC');
-	if (pProcess != NULL)
+	if (dosName.Buffer)
+	{
+		ArvFreeUnicodeString(&dosName, 'SOD');
+	}
+	if (fullPath.Buffer)
+	{
+		ArvFreeUnicodeString(&fullPath, 'POC');
+	}
+	/*if (pProcess != NULL)
 	{
 		ObDereferenceObject(pProcess);
-	}
+	}*/
 	/*if (status != FLT_PREOP_COMPLETE)
 	{
 		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -1389,6 +1398,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
 	{
 		status = FLT_PREOP_SYNCHRONIZE;
+	}
+	if (status != FLT_PREOP_COMPLETE)
+	{
+		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 	return status;
 }
@@ -2024,7 +2037,7 @@ CONST FLT_REGISTRATION g_filterRegistration =
 	sizeof(FLT_REGISTRATION),      //  Size
 	FLT_REGISTRATION_VERSION,      //  Version
 	0,                             //  Flags
-	ContextRegistration,                          //  Context registration
+	ContextRegistration,           //  Context registration
 	g_callbacks,                   //  Operation callbacks
 	InstanceFilterUnloadCallback,  //  FilterUnload
 	InstanceSetupCallback,         //  InstanceSetup
