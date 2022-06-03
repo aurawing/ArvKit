@@ -228,7 +228,7 @@ BOOL ConfigArvFilter()
 	}
 }
 
-BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen)
+BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen)
 {
 	AcquireSRWLockExclusive(&configLock);
 	if (jsonConfig == NULL)
@@ -263,6 +263,7 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen)
 	//cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
 	cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(id));
 	cJSON_AddItemToObject(item, "pubkey", cJSON_CreateString(pubkey));
+	cJSON_AddItemToObject(item, "url", cJSON_CreateString(url));
 	cJSON_AddItemToObject(item, "path", pathItem);
 	if (selindex >= 0)
 	{
@@ -410,7 +411,7 @@ BOOL InitDaemonConfig()
 	return TRUE;
 }
 
-BOOL UpdateDaemonConfig(PSTR daemonName, PSTR exeName, INT keyID)
+BOOL UpdateDaemonConfig(PSTR daemonName, PSTR exeName, INT keyID, PSTR url)
 {
 	AcquireSRWLockExclusive(&daemonLock);
 	if (daemonConfig == NULL)
@@ -446,6 +447,7 @@ BOOL UpdateDaemonConfig(PSTR daemonName, PSTR exeName, INT keyID)
 	cJSON_AddItemToObject(item, "daemonName", cJSON_CreateString(daemonName));
 	cJSON_AddItemToObject(item, "exeName", cJSON_CreateString(exeName));
 	cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(keyID));
+	cJSON_AddItemToObject(item, "url", cJSON_CreateString(url));
 	if (selindex >= 0)
 	{
 		cJSON_ReplaceItemInArray(daemonConfig, selindex, item);

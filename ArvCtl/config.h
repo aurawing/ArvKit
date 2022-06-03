@@ -13,11 +13,11 @@ BOOL InitConfig();
 PSTR PrintJsonConfig();
 void ClearConfig();
 BOOL ConfigArvFilter();
-BOOL UpdateConfig(UINT id, PSTR pubkey, PZPSTR paths, BOOL *isDBs, UINT pathLen);
+BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen);
 BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB);
 PSTR LoadDBConf();
 
 BOOL InitDaemonConfig();
-BOOL UpdateDaemonConfig(PSTR daemonPath, PSTR exePath, INT keyID);
+BOOL UpdateDaemonConfig(PSTR daemonPath, PSTR exePath, INT keyID, PSTR url);
 PSTR PrintDaemonConfig(PSTR daemonName);
 void ClearDaemonConfig();

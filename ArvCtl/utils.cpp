@@ -84,6 +84,7 @@ HRESULT SendSetRulesMessage(POpRule *rules, UINT len)
 	OpSetRules msg;
 	memset(&msg, 0, sizeof(OpSetRules));
 	msg.command = SET_RULES;
+	msg.controlProcID = GetCurrentProcessId();
 	msg.rules = rules;
 	msg.ruleLen = len;
 	hResult = SendToDriver(&msg.command, sizeof(msg));
@@ -200,7 +201,7 @@ int CopyByBlock(const TCHAR *dest_file_name, const TCHAR *src_file_name)
 {
 	FILE *fp1, *fp2;
 	_wfopen_s(&fp1, dest_file_name, L"wb");
-	_wfopen_s(&fp2, src_file_name, L"rb");
+	errno_t err = _wfopen_s(&fp2, src_file_name, L"rb");
 	if (fp1 == NULL) {
 		perror("fp1:");
 		return -1;

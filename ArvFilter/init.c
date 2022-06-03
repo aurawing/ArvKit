@@ -1,6 +1,9 @@
 #include "pch.h"
 
 #define SYSTEMPROCESSINFORMATION 5
+
+NTKERNELAPI UCHAR* PsGetProcessImageFileName(IN PEPROCESS Process);
+
 //处理进程信息，需要用到这两个结构体
 typedef struct _SYSTEM_THREADS
 {
@@ -53,6 +56,8 @@ NTSTATUS InitProcessList()
 	ULONG retLength;  //缓冲区长度
 	PVOID pProcInfo;
 	PSYSTEM_PROCESSES pProcIndex;
+	PEPROCESS pProcess;
+	NTSTATUS ntStatus = STATUS_SUCCESS;
 	InitializeListHead(&AllowedProcs);
 	//调用函数，获取进程信息
 	nStatus = ZwQuerySystemInformation(
@@ -93,6 +98,16 @@ NTSTATUS InitProcessList()
 			//进程名字字符串处理，防止打印时，出错
 			if (pProcIndex->ProcessName.Buffer == NULL)
 				pProcIndex->ProcessName.Buffer = L"NULL";
+			ntStatus = PsLookupProcessByProcessId((HANDLE)pProcIndex->ProcessId, &pProcess);
+			if (NT_SUCCESS(ntStatus))
+			{
+				char *pStrProcessName = PsGetProcessImageFileName(pProcess);
+				ObDereferenceObject(pProcess);
+				if (strcmp(pStrProcessName, "explorer.exe") == 0)
+				{
+					continue;
+				}
+			}
 			DbgPrint("ProcName:  %-20ws     pid:  %u\n", pProcIndex->ProcessName.Buffer, pProcIndex->ProcessId);
 			ArvAddProc(&AllowedProcs, pProcIndex->ProcessId);
 		} while (pProcIndex->NextEntryDelta != 0);
@@ -134,11 +149,9 @@ BOOLEAN ProcAllowed(ULONG ProcID)
 		return FALSE;
 	}*/
 
-
-
-	WCHAR sidSystem[] = { 'S','-','1','-','5','-', '18' };
-	WCHAR sidLocalService[] = { 'S','-','1','-','5','-', '19' };
-	WCHAR sidNetworkService[] = { 'S','-','1','-','5','-', '20' };
+	WCHAR sidSystem[] = { 'S','-','1','-','5','-','1','8' };
+	WCHAR sidLocalService[] = { 'S','-','1','-','5','-','1','9' };
+	WCHAR sidNetworkService[] = { 'S','-','1','-','5','-','2','0' };
 
 	NTSTATUS    status;
 	HANDLE      processToken = NULL;
@@ -156,22 +169,6 @@ BOOLEAN ProcAllowed(ULONG ProcID)
 		DbgPrint("Cannot open token for process %u: %08X", ProcID, status);
 		goto Cleanup;
 	}
-
-	//PEPROCESS pProcess = NULL;
-
-
-	//if (!procBasicInfo || !sid) {
-	//	return STATUS_INVALID_PARAMETER;
-	//}
-
-	
-
-	/*status = PsLookupProcessByProcessId((HANDLE)ProcID, &pProcess);
-	if (!NT_SUCCESS(status))
-	{
-		DbgPrint("Cannot find process %u: %08X", ProcID, status);
-		goto Cleanup;
-	}*/
 
 	// Open process token
 	status = ZwOpenProcessTokenEx(handle, GENERIC_READ,
@@ -223,10 +220,6 @@ BOOLEAN ProcAllowed(ULONG ProcID)
 	}
 
 Cleanup:
-	/*if (pProcess)
-	{
-		ObDereferenceObject(pProcess);
-	}*/
 	if (processToken) {
 		ZwClose(processToken);
 	}

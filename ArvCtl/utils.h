@@ -33,6 +33,7 @@ typedef struct _OpRule {
 
 typedef struct _OpSetRules { //²Ù×÷Êý¾Ý
 	OpCommand command;
+	ULONG controlProcID;
 	POpRule *rules;
 	UINT		ruleLen;
 } OpSetRules, *POpSetRules;

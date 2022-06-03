@@ -101,6 +101,8 @@ void process(WFHttpTask *server_task)
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
 			int id = idEntry->valueint;
+			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
+			PSTR url = urlEntry->valuestring;
 			cJSON *pkEntry = cJSON_GetObjectItem(jsonHead, "pubkey");
 			PSTR pubkey = pkEntry->valuestring;
 			if (!VerifyPublicKey(pubkey))
@@ -135,7 +137,7 @@ void process(WFHttpTask *server_task)
 					}
 					if (flag)
 					{
-						UpdateConfig(id, pubkey, paths, isDBs, pathLen);
+						UpdateConfig(id, pubkey, url, paths, isDBs, pathLen);
 						free(paths);
 						free(isDBs);
 						user_resp->set_status_code("200");
@@ -227,37 +229,66 @@ void process(WFHttpTask *server_task)
 			ch[12] = L'x';
 			ch[13] = L'e';
 			ch[14] = L'\0';
+
 			cJSON *daemonNameEntry = cJSON_GetObjectItem(jsonHead, "daemonName");
 			cJSON *exeNameEntry = cJSON_GetObjectItem(jsonHead, "exeName");
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
+			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
 			PWSTR dpath = NULL;
+			PWSTR epath = NULL;
 			UTF8ToUnicode(daemonNameEntry->valuestring, &dpath);
-			int len = CopyByBlock(dpath, daemonExePath);
-			if (len < 0)
-			{
+			UTF8ToUnicode(exeNameEntry->valuestring, &epath);
+			FILE *fp;
+			errno_t err = _wfopen_s(&fp, epath, L"rb");
+			if (err > 0) {
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -40, \"msg\": \"copy daemon failed\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -43, \"msg\": \"source file not exist\", \"data\": {}}");
 			}
 			else
 			{
-				BOOL ret = UpdateDaemonConfig(daemonNameEntry->valuestring, exeNameEntry->valuestring, keyIDEntry->valueint);
-				if (ret) {
-					//char *jsonstr = PrintDaemonConfig(NULL);
-					user_resp->set_status_code("200");
-					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
-					//user_resp->append_output_body(jsonstr);
-					//user_resp->append_output_body("}");
-					//free(jsonstr);
+				int len = CopyByBlock(dpath, daemonExePath);
+				if (len < 0)
+				{
+					if (len == -2)
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -42, \"msg\": \"arvdaemon file not exist\", \"data\": {}}");
+					}
+					else
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -40, \"msg\": \"copy daemon failed\", \"data\": {}}");
+					}
 				}
 				else
 				{
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -41, \"msg\": \"parse parameter failed\", \"data\": {}}");
+					BOOL ret = UpdateDaemonConfig(daemonNameEntry->valuestring, exeNameEntry->valuestring, keyIDEntry->valueint, urlEntry->valuestring);
+					if (ret) {
+						//char *jsonstr = PrintDaemonConfig(NULL);
+						user_resp->set_status_code("200");
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+						//user_resp->append_output_body(jsonstr);
+						//user_resp->append_output_body("}");
+						//free(jsonstr);
+					}
+					else
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -41, \"msg\": \"parse parameter failed\", \"data\": {}}");
+					}
 				}
+			}
+			if (fp != NULL)
+			{
+				fclose(fp);
 			}
 			if (dpath != NULL)
 			{
 				free(dpath);
+			}
+			if (epath != NULL)
+			{
+				free(epath);
 			}
 		}
 		else if (ifnamestr == "loaddaemonconf")
