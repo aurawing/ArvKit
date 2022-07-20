@@ -9,6 +9,8 @@
 extern UINT listenPort;
 extern char *keyManageAddr;
 
+BOOL InitSysConfig();
+BOOL UpdateSysConfig(UINT listenPort, PSTR keyManageAddr);
 BOOL InitConfig();
 PSTR PrintJsonConfig();
 void ClearConfig();

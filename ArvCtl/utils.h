@@ -11,6 +11,7 @@ typedef enum _OpCommand {  //操作命令
 	SET_RULES = 1,
 	GET_STAT = 2,
 	SET_DB_CONF = 3,
+	SET_ALLOW_UNLOAD = 4,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -44,6 +45,11 @@ typedef struct _OpSetDBConf { //设置DB路径
 	PWSTR path;
 } OpSetDBConf, *POpSetDBConf;
 
+typedef struct _OpSetAllowUnload { //设置允许卸载驱动
+	OpCommand command;
+	BOOL allow;
+} OpSetAllowUnload, *POpSetAllowUnload;
+
 typedef struct _RepStat { //返回统计信息
 	//BYTE SHA256[SHA256_BLOCK_SIZE];
 	ULONGLONG KeyCount;
@@ -68,6 +74,7 @@ HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);
 HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path);
+HRESULT SendAllowUnloadMessage(BOOL allow);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
 //VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);

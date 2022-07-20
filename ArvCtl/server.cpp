@@ -317,6 +317,61 @@ void process(WFHttpTask *server_task)
 				free(jsonstr);
 			}
 		}
+		else if (ifnamestr == "kms")
+		{
+			cJSON *portEntry = cJSON_GetObjectItem(jsonHead, "port");
+			int port = 0;
+			if (portEntry != NULL)
+			{
+				port = portEntry->valueint;
+			}
+			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
+			BOOL ret = UpdateSysConfig(port, urlEntry->valuestring);
+			if (ret)
+			{
+				HKEY hKey = NULL;
+				TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+				LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+				if (lRet == ERROR_SUCCESS) {
+					RegDeleteValue(hKey, _T("keyManageAddr"));
+					PWSTR kma;
+					UTF8ToUnicode(urlEntry->valuestring, &kma);
+					DWORD len = sizeof(TCHAR)*(wcslen(kma) + 1);
+					if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("keyManageAddr"), 0, REG_SZ, (const BYTE*)kma, len))
+					{
+						RegCloseKey(hKey);
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -62, \"msg\": \"save registry of system config failed\", \"data\": {}}");
+					}
+					RegCloseKey(hKey);
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				}
+				else {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -61, \"msg\": \"open registry of system config failed\", \"data\": {}}");
+				}
+			}
+			else
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -60, \"msg\": \"save system config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "allowunload")
+		{
+			cJSON *allowUnloadEntry = cJSON_GetObjectItem(jsonHead, "allow");
+			if (cJSON_IsTrue(allowUnloadEntry))
+			{
+				SendAllowUnloadMessage(TRUE);
+			}
+			else
+			{
+				SendAllowUnloadMessage(FALSE);
+			}
+			user_resp->set_status_code("200");
+			user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+		}
 		else
 		{
 			user_resp->set_status_code("450");

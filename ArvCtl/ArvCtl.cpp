@@ -55,6 +55,7 @@ int WriteToLog(char*);
 //
 int __cdecl _tmain(int argc, TCHAR *argv[])
 {
+	//Sleep(20000);
 	// If command-line parameter is "install", install the service. 
 	// Otherwise, the service is probably being started by the SCM.
 	setlocale(LC_ALL, "");
@@ -297,7 +298,7 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 		// Check whether to stop the service.
 		WaitForSingleObject(ghSvcStopEvent, INFINITE);
 		StopArvCtlServer();
-		StopArvFilter();
+		//StopArvFilter();
 		ClearConfig();
 		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);

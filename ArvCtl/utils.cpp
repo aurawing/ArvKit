@@ -103,6 +103,17 @@ HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path)
 	return hResult;
 }
 
+HRESULT SendAllowUnloadMessage(BOOL allow)
+{
+	HRESULT hResult = S_OK;
+	OpSetAllowUnload msg;
+	memset(&msg, 0, sizeof(OpSetAllowUnload));
+	msg.command = SET_ALLOW_UNLOAD;
+	msg.allow = allow;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 {
 	DWORD dwUnicodeLen;    //转换后Unicode的长度

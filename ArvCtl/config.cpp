@@ -78,6 +78,33 @@ BOOL InitSysConfig()
 	return TRUE;
 }
 
+BOOL UpdateSysConfig(UINT port, PSTR keyManageAddr)
+{
+	if (port == 0)
+	{
+		port = listenPort;
+	}
+	AcquireSRWLockExclusive(&configLock);
+	cJSON *item = cJSON_CreateObject();
+	cJSON_AddItemToObject(item, "listenPort", cJSON_CreateNumber(port));
+	cJSON_AddItemToObject(item, "keyManageAddr", cJSON_CreateString(keyManageAddr));
+
+	errno_t err;
+	FILE *fp;
+	err = _wfopen_s(&fp, serConfigPath, L"wb");
+	if (err != 0)
+	{
+		ReleaseSRWLockExclusive(&configLock);
+		return FALSE;
+	}
+	PSTR jsonstr = cJSON_Print(item);
+	fprintf(fp, jsonstr);
+	fclose(fp);
+	cJSON_Delete(item);
+	ReleaseSRWLockExclusive(&configLock);
+	return TRUE;
+}
+
 BOOL InitConfig()
 {
 	if (!InitSysConfig())
@@ -129,6 +156,13 @@ BOOL InitConfig()
 		return FALSE;
 	}
 	return TRUE;
+}
+
+void UpdateAllowUnload(BOOL allow)
+{
+	AcquireSRWLockExclusive(&configLock);
+	SendAllowUnloadMessage(allow);
+	ReleaseSRWLockExclusive(&configLock);
 }
 
 PSTR PrintJsonConfig()

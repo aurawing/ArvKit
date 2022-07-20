@@ -1,5 +1,7 @@
 #pragma once
 
+#include <windef.h>
+
 typedef struct _PathStat {
 	volatile ULONGLONG passCounter;
 	volatile ULONGLONG blockCounter;
@@ -29,9 +31,16 @@ typedef struct _RuleEntry {
 	LIST_ENTRY Procs;
 } RuleEntry, *PRuleEntry;
 
+typedef struct _RegProcEntry {
+	LIST_ENTRY entry;
+	PSTR ProcName;
+	UINT RuleID;
+} RegProcEntry, *PRegProcEntry;
+
 //π˝¬ÀπÊ‘Ú
 typedef struct _FilterConfig {
 	LIST_ENTRY Rules;
+	LIST_ENTRY RegProcs;
 	volatile ULONGLONG readCount;
 	volatile ULONGLONG writeCount;
 	volatile ULONGLONG readCountDB;
@@ -42,12 +51,17 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
+VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvFreeRule(PRuleEntry pRuleEntry);
 PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
 BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
+UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID);
+BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);
+VOID ArvFreeRegProcs(PFilterConfig pFilterConfig);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);
 VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32]);
 int ArvGetTime();

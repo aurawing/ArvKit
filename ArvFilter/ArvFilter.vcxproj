@@ -35,8 +35,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Comm.c" />
     <ClCompile Include="config.c" />
+    <ClCompile Include="Context.c" />
     <ClCompile Include="crypto.c" />
+    <ClCompile Include="Dpc.c" />
+    <ClCompile Include="FileFuncs.c" />
     <ClCompile Include="init.c" />
     <ClCompile Include="libbase58\base58.c" />
     <ClCompile Include="libripemd160\memzero.c" />
@@ -45,6 +49,7 @@
     <ClCompile Include="libsecp256k1\src\precomputed_ecmult_gen.c" />
     <ClCompile Include="libsecp256k1\src\secp256k1.c" />
     <ClCompile Include="libsha256\sha256.c" />
+    <ClCompile Include="Utils.c" />
     <ResourceCompile Include="ArvFilter.rc" />
     <ClCompile Include="ArvFilter.c" />
     <Inf Include="ArvFilter.inf" />
@@ -207,10 +212,16 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="comm.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="context.h" />
     <ClInclude Include="crypto.h" />
+    <ClInclude Include="dpc.h" />
+    <ClInclude Include="filefuncs.h" />
+    <ClInclude Include="global.h" />
     <ClInclude Include="init.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

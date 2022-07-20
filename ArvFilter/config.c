@@ -4,6 +4,7 @@
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 {
 	InitializeListHead(&pFilterConfig->Rules);
+	InitializeListHead(&pFilterConfig->RegProcs);
 }
 
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen)
@@ -112,6 +113,31 @@ BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
 	return FALSE;
 }
 
+VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
+	while (pListEntry != &pFilterConfig->Rules)
+	{
+		PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
+		while (pListEntry2 != &pRuleEntry->Procs)
+		{
+			PProcEntry ppe = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
+			if (ppe->ProcID == procID)
+			{
+				DbgPrint("[FsFilter:ArvRemoveProcEx]del proc %d - %d\n", procID, pRuleEntry->ID);
+				PLIST_ENTRY pListEntry3 = pListEntry2->Flink;
+				RemoveEntryList(pListEntry2);
+				ExFreePoolWithTag(ppe, 'FME');
+				pListEntry2 = pListEntry3;
+				continue;
+			}
+			pListEntry2 = pListEntry2->Flink;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+}
+
 VOID ArvFreeRules(PFilterConfig pFilterConfig)
 {
 	while (pFilterConfig->Rules.Flink != &pFilterConfig->Rules)
@@ -187,6 +213,78 @@ VOID ArvFreeProcs(PLIST_ENTRY pHead)
 		PProcEntry pProcEntry = CONTAINING_RECORD(pDelProcEntry, ProcEntry, entry);
 		pProcEntry->ProcID = 0;
 		ExFreePoolWithTag(pProcEntry, 'POC');
+	}
+}
+
+UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
+	while (pListEntry != &pFilterConfig->RegProcs)
+	{
+		PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+		if (strcmp(pRegProcEntry->ProcName, procName) == 0)
+		{
+			return pRegProcEntry->RuleID;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return 0;
+}
+
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
+	while (pListEntry != &pFilterConfig->RegProcs)
+	{
+		PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+		if (strcmp(pRegProcEntry->ProcName, procName) == 0)
+		{
+			pRegProcEntry->RuleID = ruleID;
+			return;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+
+	PRegProcEntry pRegProcEntry = (PRegProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(RegProcEntry), 'RLE');
+	RtlZeroMemory(pRegProcEntry, sizeof(RegProcEntry));
+	PSTR regProcName = (PSTR)ExAllocatePoolWithTag(PagedPool, strlen(procName)+1, 'RLE');
+	RtlCopyMemory(regProcName, procName, strlen(procName)+1);
+	pRegProcEntry->ProcName = regProcName;
+	pRegProcEntry->RuleID = ruleID;
+	InsertTailList(&pFilterConfig->RegProcs, &pRegProcEntry->entry);
+}
+
+BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
+	while (pListEntry != &pFilterConfig->RegProcs)
+	{
+		PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+		if (strcmp(pRegProcEntry->ProcName, procName) == 0)
+		{
+			DbgPrint("[FsFilter:ArvFreeRegProc]del reg proc %s - %d\n", procName, pRegProcEntry->RuleID);
+			RemoveEntryList(pListEntry);
+			ExFreePoolWithTag(pRegProcEntry->ProcName, 'POC');
+			pRegProcEntry->ProcName = NULL;
+			pRegProcEntry->RuleID = 0;
+			ExFreePoolWithTag(pRegProcEntry, 'FME');
+			return TRUE;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return FALSE;
+}
+
+VOID ArvFreeRegProcs(PFilterConfig pFilterConfig)
+{
+	while (pFilterConfig->RegProcs.Flink != &pFilterConfig->RegProcs)
+	{
+		PLIST_ENTRY pDelRegProcEntry = RemoveTailList(&pFilterConfig->RegProcs);
+		PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pDelRegProcEntry, RegProcEntry, entry);
+		ExFreePoolWithTag(pRegProcEntry->ProcName, 'POC');
+		pRegProcEntry->ProcName = NULL;
+		pRegProcEntry->RuleID = 0;
+		ExFreePoolWithTag(pRegProcEntry, 'POC');
 	}
 }
 
