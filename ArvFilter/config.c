@@ -216,6 +216,27 @@ VOID ArvFreeProcs(PLIST_ENTRY pHead)
 	}
 }
 
+VOID ArvAddRuleEntry2(PLIST_ENTRY pHead, PRuleEntry entry, BOOL underDBPath)
+{
+	PRuleEntry2 pRuleEntry2 = (PRuleEntry2)ExAllocatePoolWithTag(PagedPool, sizeof(RuleEntry2), 'RLE');
+	RtlZeroMemory(pRuleEntry2, sizeof(RuleEntry2));
+	pRuleEntry2->pRuleEntry = entry;
+	pRuleEntry2->underDBPath = underDBPath;
+	InsertTailList(pHead, &pRuleEntry2->entry);
+}
+
+VOID ArvFreeRuleEntry2(PLIST_ENTRY pHead)
+{
+	while (pHead->Flink != pHead)
+	{
+		PLIST_ENTRY pDelProcEntry = RemoveTailList(pHead);
+		PRuleEntry2 pRuleEntry2 = CONTAINING_RECORD(pDelProcEntry, RuleEntry2, entry);
+		pRuleEntry2->pRuleEntry = NULL;
+		pRuleEntry2->underDBPath = FALSE;
+		ExFreePoolWithTag(pRuleEntry2, 'POC');
+	}
+}
+
 UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;

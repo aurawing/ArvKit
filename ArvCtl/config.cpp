@@ -131,11 +131,13 @@ BOOL InitConfig()
 	int file_size;
 	if (_waccess(configPath, 0))
 	{
+		jsonConfig = cJSON_Parse("[]");
 		return TRUE;
 	}
 	err = _wfopen_s(&fp, configPath, L"rb");
 	if (err != 0)
 	{
+		jsonConfig = cJSON_Parse("[]");
 		return FALSE;
 	}
 	fseek(fp, 0, SEEK_END);
@@ -153,6 +155,7 @@ BOOL InitConfig()
 	ReleaseSRWLockExclusive(&configLock);
 	if (jsonConfig == NULL)
 	{
+		jsonConfig = cJSON_Parse("[]");
 		return FALSE;
 	}
 	return TRUE;
@@ -194,50 +197,55 @@ BOOL ConfigArvFilter()
 		return TRUE;
 	}
 	AcquireSRWLockShared(&configLock);
-	int ruleSize = cJSON_GetArraySize(jsonConfig);
+	int ruleSize = cJSON_GetArraySize(jsonConfig); 
 	cJSON *pJsonRule;
 	cJSON *pJsonRuleItem;
 	cJSON *pJsonPathItem;
 	cJSON *pJsonPath;
 	cJSON *pJsonIsDB;
 	POpRule pRule;
-	POpRule *pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
+	POpRule *pzpRules;
 	HRESULT result = S_OK;
-	for (int i = 0; i < ruleSize; i++)
+	if (ruleSize > 0)
 	{
-		pRule = (POpRule)malloc(sizeof(OpRule));
-		pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "id");
-		pRule->id = pJsonRuleItem->valueint;
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "pubkey");
-		UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
-		pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "path");
-		int pathLen = cJSON_GetArraySize(pJsonRuleItem);
-		pRule->pathsLen = pathLen;
-		pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
-		pRule->isDB = (BOOL*)malloc(pathLen * sizeof(BOOL));
-		for (int j = 0; j < pathLen; j++)
+		pzpRules = (POpRule*)malloc(ruleSize * sizeof(POpRule));
+		for (int i = 0; i < ruleSize; i++)
 		{
-			pJsonPathItem = cJSON_GetArrayItem(pJsonRuleItem, j);
-			pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
-			pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
-			UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
-			if (cJSON_IsTrue(pJsonIsDB))
-				pRule->isDB[j] = TRUE;
-			else if (cJSON_IsFalse(pJsonIsDB))
-				pRule->isDB[j] = FALSE;
+			pRule = (POpRule)malloc(sizeof(OpRule));
+			pJsonRule = cJSON_GetArrayItem(jsonConfig, i);
+			pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "id");
+			pRule->id = pJsonRuleItem->valueint;
+			pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "pubkey");
+			UTF8ToUnicode(pJsonRuleItem->valuestring, &pRule->pubKey);
+			pJsonRuleItem = cJSON_GetObjectItem(pJsonRule, "path");
+			int pathLen = cJSON_GetArraySize(pJsonRuleItem);
+			pRule->pathsLen = pathLen;
+			pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
+			pRule->isDB = (BOOL*)malloc(pathLen * sizeof(BOOL));
+			for (int j = 0; j < pathLen; j++)
+			{
+				pJsonPathItem = cJSON_GetArrayItem(pJsonRuleItem, j);
+				pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
+				pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+				UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
+				if (cJSON_IsTrue(pJsonIsDB))
+					pRule->isDB[j] = TRUE;
+				else if (cJSON_IsFalse(pJsonIsDB))
+					pRule->isDB[j] = FALSE;
+			}
+			pzpRules[i] = pRule;
 		}
-		pzpRules[i] = pRule;
+		result = SendSetRulesMessage(pzpRules, ruleSize);
+		FreeRuleList(pzpRules, ruleSize);
+		free(pzpRules);
+		pzpRules = NULL;
 	}
-	if (ruleSize == 0)
+	else
 	{
+		result = SendSetRulesMessage(NULL, 0);
 		ReleaseSRWLockShared(&configLock);
 		return TRUE;
 	}
-	result = SendSetRulesMessage(pzpRules, ruleSize);
-	FreeRuleList(pzpRules, ruleSize);
-	free(pzpRules);
-	pzpRules = NULL;
 
 	errno_t err;
 	FILE *fp;

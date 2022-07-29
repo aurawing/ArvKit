@@ -37,11 +37,22 @@ VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
 	PEPROCESS pProcess = NULL;
 	while (TRUE)
 	{
+		PLIST_ENTRY pListEntry = pProcHead->Flink;
+		while (pListEntry != pProcHead)
+		{
+			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
+			if (pProcEntry->ProcID == processID)
+			{
+				return;
+			}
+			pListEntry = pListEntry->Flink;
+		}
+
 		ArvAddProc(pProcHead, processID);
 		status = PsLookupProcessByProcessId((HANDLE)processID, &pProcess);
 		if (!NT_SUCCESS(status))
 		{
-			break;
+			return;
 		}
 		processID = (ULONG)PsGetProcessInheritedFromUniqueProcessId(pProcess);
 		ObDereferenceObject(pProcess);

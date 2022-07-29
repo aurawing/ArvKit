@@ -31,6 +31,12 @@ typedef struct _RuleEntry {
 	LIST_ENTRY Procs;
 } RuleEntry, *PRuleEntry;
 
+typedef struct _RuleEntry2 {
+	LIST_ENTRY entry;
+	PRuleEntry pRuleEntry;
+	BOOL underDBPath;
+} RuleEntry2, *PRuleEntry2;
+
 typedef struct _RegProcEntry {
 	LIST_ENTRY entry;
 	PSTR ProcName;
@@ -58,6 +64,8 @@ PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
 BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
+VOID ArvAddRuleEntry2(PLIST_ENTRY pHead, PRuleEntry entry, BOOL underDBPath);
+VOID ArvFreeRuleEntry2(PLIST_ENTRY pHead);
 UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
 VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID);
 BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);

@@ -139,8 +139,16 @@ MiniMessage(
 				ArvFreeRules(&filterConfig);
 				tmpConfig.RegProcs = filterConfig.RegProcs;
 				filterConfig = tmpConfig;
-				tmpConfig.Rules.Blink->Flink = &filterConfig.Rules;
-				tmpConfig.Rules.Flink->Blink = &filterConfig.Rules;
+				if (pOpSetRules->ruleLen > 0)
+				{
+					tmpConfig.Rules.Blink->Flink = &filterConfig.Rules;
+					tmpConfig.Rules.Flink->Blink = &filterConfig.Rules;
+				}
+				else
+				{
+					filterConfig.Rules.Flink = &filterConfig.Rules;
+					filterConfig.Rules.Blink = &filterConfig.Rules;
+				}
 				ExReleaseResourceLite(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
