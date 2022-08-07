@@ -44,3 +44,16 @@ USHORT ArvQueryVolumeSectorSize(IN PFLT_VOLUME Volume)
 
 	return max(VolProp->SectorSize, MIN_SECTOR_SIZE);
 }
+
+UINT ArvCalculateCharCountWithinUnicodeString(PUNICODE_STRING str, WCHAR c)
+{
+	UINT count = 0;
+	for (UINT i = 0; i < str->Length / sizeof(wchar_t); i++)
+	{
+		if (str->Buffer[i] == c)
+		{
+			count++;
+		}
+	}
+	return count;
+}

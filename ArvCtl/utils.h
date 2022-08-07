@@ -12,6 +12,7 @@ typedef enum _OpCommand {  //操作命令
 	GET_STAT = 2,
 	SET_DB_CONF = 3,
 	SET_ALLOW_UNLOAD = 4,
+	SET_CONTROL_PROC = 5,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -50,6 +51,11 @@ typedef struct _OpSetAllowUnload { //设置允许卸载驱动
 	BOOL allow;
 } OpSetAllowUnload, *POpSetAllowUnload;
 
+typedef struct _OpSetControlProc { //修改控制进程ID
+	OpCommand command;
+	ULONG controlProcID;
+} OpSetControlProc, *POpSetControlProc;
+
 typedef struct _RepStat { //返回统计信息
 	//BYTE SHA256[SHA256_BLOCK_SIZE];
 	ULONGLONG KeyCount;
@@ -70,6 +76,7 @@ typedef struct _ArvDiskInfo {
 
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
+HRESULT SendSetControlProcMessage(BOOL disable);
 HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out DWORD *bytesReturned);
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);

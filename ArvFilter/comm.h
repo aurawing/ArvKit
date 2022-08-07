@@ -14,6 +14,7 @@ typedef enum _OP_COMMAND {  //操作命令
 	GET_STAT,
 	SET_DB_CONF,
 	SET_ALLOW_UNLOAD,
+	SET_CONTROL_PROC,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -66,6 +67,11 @@ typedef struct _RepStat { //返回统计信息
 	ULONGLONG ReadDB;
 	ULONGLONG WriteDB;
 } RepStat, *PRepStat;
+
+typedef struct _OpSetControlProc { //修改控制进程ID
+	OpCommand command;
+	ULONG controlProcID;
+} OpSetControlProc, *POpSetControlProc;
 
 //用户态和内核态建立连接
 NTSTATUS

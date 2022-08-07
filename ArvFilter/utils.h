@@ -82,3 +82,4 @@ LONGLONG ArvQueryEndOfFileInfo(
 	IN PFILE_OBJECT FileObject);
 
 USHORT ArvQueryVolumeSectorSize(IN PFLT_VOLUME Volume);
+UINT ArvCalculateCharCountWithinUnicodeString(PUNICODE_STRING str, WCHAR c);

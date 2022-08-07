@@ -69,6 +69,7 @@ MiniMessage(
 		OpSetRules *pOpSetRules = NULL;
 		OpSetDBConf *pOpSetDBConf = NULL;
 		OpSetAllowUnload *pOpSetAllowUnload = NULL;
+		OpSetControlProc *pOpSetControlProc = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -77,7 +78,7 @@ MiniMessage(
 			case SET_PROC:
 				pOpSetProc = (OpSetProc*)InputBuffer;
 				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
-				BOOL ret = ArvMapRule(&filterConfig, pOpSetProc->procID, pOpSetProc->ruleID);
+				BOOL ret = ArvMapRule(&filterConfig, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
 				ExReleaseResourceLite(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]add procID %d: %d - %d\n", ret, pOpSetProc->procID, pOpSetProc->ruleID);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
@@ -105,7 +106,7 @@ MiniMessage(
 							while (pListEntry2 != &pRuleEntry->Procs)
 							{
 								PProcEntry ppe = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
-								ArvAddProc(&newRuleEntry->Procs, ppe->ProcID);
+								ArvAddProc(&newRuleEntry->Procs, ppe->ProcID, ppe->Inherit);
 								pListEntry2 = pListEntry2->Flink;
 							}
 
@@ -212,6 +213,15 @@ MiniMessage(
 				pStats->WriteDB = filterConfig.writeCountDB;
 				ExReleaseResourceLite(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat);
+				break;
+			case SET_CONTROL_PROC:
+				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				pOpSetControlProc = (OpSetControlProc*)InputBuffer;
+				controlProcID = pOpSetControlProc->controlProcID;
+				ExReleaseResourceLite(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]set procID %d\n", pOpSetControlProc->controlProcID);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
 			}
 		} except(EXCEPTION_EXECUTE_HANDLER) {

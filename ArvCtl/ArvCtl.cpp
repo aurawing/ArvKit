@@ -163,7 +163,7 @@ VOID SvcInstall()
 //
 VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 {
-	SendSetRulesMessage(NULL, 0);
+	SendSetControlProcMessage(FALSE);
 	// Register the handler function for the service
 	GetModuleFileName(NULL, logPath, MAX_PATH);
 	WCHAR *ch = wcsrchr(logPath, '\\');

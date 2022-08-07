@@ -41,7 +41,7 @@ bool ArvVerifySig(char *msg, char *sig58, char *pubkey58)
 	{
 		rawSig58 = &sig58[7];
 	}
-	if (strlen(rawSig58) > 95)
+	if (rawSig58 == NULL || strlen(rawSig58) > 95)
 	{
 		return false; //签名长度过长
 	}

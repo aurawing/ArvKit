@@ -55,7 +55,7 @@ PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID)
 	return NULL;
 }
 
-BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
+BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
 	while (pListEntry != &pFilterConfig->Rules)
@@ -77,6 +77,7 @@ BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID)
 			PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'FME');
 			RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 			pProcEntry->ProcID = procID;
+			pProcEntry->Inherit = inherit;
 			InsertTailList(&pRuleEntry->Procs, &pProcEntry->entry);
 			DbgPrint("[FsFilter:addRule]new %d - %d\n", procID, ruleID);
 			return TRUE;
@@ -197,11 +198,12 @@ BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path)
 	return FALSE;
 }
 
-VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID)
+VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID, BOOL inherit)
 {
 	PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'RLE');
 	RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 	pProcEntry->ProcID = procID;
+	pProcEntry->Inherit = inherit;
 	InsertTailList(pHead, &pProcEntry->entry);
 }
 
@@ -252,7 +254,22 @@ UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName)
 	return 0;
 }
 
-VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID)
+PRegProcEntry ArvGetRegProcEntryByRegProcName(PFilterConfig pFilterConfig, PSTR procName)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
+	while (pListEntry != &pFilterConfig->RegProcs)
+	{
+		PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+		if (strcmp(pRegProcEntry->ProcName, procName) == 0)
+		{
+			return pRegProcEntry;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return NULL;
+}
+
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UINT ruleID)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
 	while (pListEntry != &pFilterConfig->RegProcs)
@@ -261,6 +278,7 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID)
 		if (strcmp(pRegProcEntry->ProcName, procName) == 0)
 		{
 			pRegProcEntry->RuleID = ruleID;
+			pRegProcEntry->Inherit = inherit;
 			return;
 		}
 		pListEntry = pListEntry->Flink;
@@ -272,6 +290,7 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID)
 	RtlCopyMemory(regProcName, procName, strlen(procName)+1);
 	pRegProcEntry->ProcName = regProcName;
 	pRegProcEntry->RuleID = ruleID;
+	pRegProcEntry->Inherit = inherit;
 	InsertTailList(&pFilterConfig->RegProcs, &pRegProcEntry->entry);
 }
 
@@ -288,6 +307,7 @@ BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName)
 			ExFreePoolWithTag(pRegProcEntry->ProcName, 'POC');
 			pRegProcEntry->ProcName = NULL;
 			pRegProcEntry->RuleID = 0;
+			pRegProcEntry->Inherit = FALSE;
 			ExFreePoolWithTag(pRegProcEntry, 'FME');
 			return TRUE;
 		}

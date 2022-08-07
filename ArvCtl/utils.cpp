@@ -66,6 +66,24 @@ HRESULT SendToDriver(LPVOID lpInBuffer, DWORD dwInBufferSize)
 	return hResult;
 }
 
+HRESULT SendSetControlProcMessage(BOOL disable)
+{
+	HRESULT hResult = S_OK;
+	OpSetControlProc msg;
+	memset(&msg, 0, sizeof(OpSetControlProc));
+	msg.command = SET_CONTROL_PROC;
+	if (disable)
+	{
+		msg.controlProcID = 0;
+	}
+	else
+	{
+		msg.controlProcID = GetCurrentProcessId();
+	}
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID)
 {
 	HRESULT hResult = S_OK;

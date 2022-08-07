@@ -109,7 +109,7 @@ NTSTATUS InitProcessList()
 				}
 			}
 			DbgPrint("ProcName:  %-20ws     pid:  %u\n", pProcIndex->ProcessName.Buffer, pProcIndex->ProcessId);
-			ArvAddProc(&AllowedProcs, pProcIndex->ProcessId);
+			ArvAddProc(&AllowedProcs, pProcIndex->ProcessId, FALSE);
 		} while (pProcIndex->NextEntryDelta != 0);
 	}
 	else

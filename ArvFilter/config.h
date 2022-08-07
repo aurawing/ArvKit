@@ -20,6 +20,7 @@ typedef struct _PathEntry {
 typedef struct _ProcEntry {
 	LIST_ENTRY entry;
 	ULONG ProcID;
+	BOOL Inherit;
 } ProcEntry, *PProcEntry;
 
 //过滤规则项，包括密钥编号、公钥、过滤目录列表
@@ -40,6 +41,7 @@ typedef struct _RuleEntry2 {
 typedef struct _RegProcEntry {
 	LIST_ENTRY entry;
 	PSTR ProcName;
+	BOOL Inherit;
 	UINT RuleID;
 } RegProcEntry, *PRegProcEntry;
 
@@ -55,19 +57,20 @@ typedef struct _FilterConfig {
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
-BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
+BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
 BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvFreeRule(PRuleEntry pRuleEntry);
 PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
 BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path);
-VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID);
+VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID, BOOL inherit);
 VOID ArvFreeProcs(PLIST_ENTRY pHead);
 VOID ArvAddRuleEntry2(PLIST_ENTRY pHead, PRuleEntry entry, BOOL underDBPath);
 VOID ArvFreeRuleEntry2(PLIST_ENTRY pHead);
 UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
-VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, UINT ruleID);
+PRegProcEntry ArvGetRegProcEntryByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UINT ruleID);
 BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);
 VOID ArvFreeRegProcs(PFilterConfig pFilterConfig);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);

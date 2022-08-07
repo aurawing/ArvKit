@@ -372,6 +372,20 @@ void process(WFHttpTask *server_task)
 			user_resp->set_status_code("200");
 			user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
 		}
+		else if (ifnamestr == "disablefilter")
+		{
+			cJSON *disableEntry = cJSON_GetObjectItem(jsonHead, "disable");
+			if (cJSON_IsTrue(disableEntry))
+			{
+				SendSetControlProcMessage(TRUE);
+			}
+			else
+			{
+				SendSetControlProcMessage(FALSE);
+			}
+			user_resp->set_status_code("200");
+			user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+		}
 		else
 		{
 			user_resp->set_status_code("450");

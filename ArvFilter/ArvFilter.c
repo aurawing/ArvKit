@@ -48,7 +48,7 @@ VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
 			pListEntry = pListEntry->Flink;
 		}
 
-		ArvAddProc(pProcHead, processID);
+		ArvAddProc(pProcHead, processID, FALSE);
 		status = PsLookupProcessByProcessId((HANDLE)processID, &pProcess);
 		if (!NT_SUCCESS(status))
 		{
@@ -267,7 +267,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	UNICODE_STRING fullPath = { 0 };
 	UNICODE_STRING dosName = { 0 };
 	PARV_VOLUME_CONTEXT volCtx = NULL;
-	BOOL underDBPath = FALSE;
+	//BOOL underDBPath = FALSE;
+	LIST_ENTRY ruleEntry2Head = { 0 };
+	InitializeListHead(&ruleEntry2Head);
 
 	//UNREFERENCED_PARAMETER(CompletionContext);
 	PAGED_CODE();
@@ -296,7 +298,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 
 	if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
 		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\')
+		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\' &&
+		ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\')==6)
 		)
 	{
 		PSTR logintag = (PSTR)ExAllocatePoolWithTag(PagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
@@ -305,8 +308,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		PSTR keyidstr = NULL;
 		PSTR timestr = NULL;
 		PSTR sigstr = NULL;
+		PSTR inheritStr = NULL;
 		bool isWChar = false;
-		int bPoint[3];
+		int bPoint[4];
 		for (UINT a = 0; a < Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t); a++)
 		{
 			if (Data->Iopb->TargetFileObject->FileName.Buffer[a] != L'\\')
@@ -340,12 +344,18 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				}
 				else if (b == 3)
 				{
+					bPoint[3] = a;
+					inheritStr = &logintag[a + 1];
+				}
+				else if (b == 4)
+				{
 					sigstr = &logintag[a + 1];
 				}
+				
 				b++;
 			}
 		}
-		if (isWChar || keyidstr == NULL || timestr == NULL || sigstr == NULL)
+		if (isWChar || keyidstr == NULL || timestr == NULL || inheritStr == NULL || sigstr == NULL )
 		{
 			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
 			Data->IoStatus.Information = 0;
@@ -373,7 +383,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(cbdContext, 'POC');
 			return FLT_PREOP_COMPLETE;
 		}
-
+		int inherit = atoi(inheritStr);
+		if (inherit > 0)
+		{
+			inherit = 1;
+		}
+		else
+		{
+			inherit = 0;
+		}
 		ExAcquireResourceSharedLite(&HashResource, TRUE);
 		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
 		if (wPubKey == NULL)
@@ -409,7 +427,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExReleaseResourceLite(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
-		for (UINT d = 0; d < 3; d++)
+		for (UINT d = 0; d < 4; d++)
 		{
 			logintag[bPoint[d]] = '\\';
 		}
@@ -429,7 +447,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0)
 		{
-			ArvMapRule(&filterConfig, procID, keyid);
+			ArvMapRule(&filterConfig, procID, inherit, keyid);
 		}
 		else if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0)
 		{
@@ -443,7 +461,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	}
 	else if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
 		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, RegoutPath, 15 * sizeof(wchar_t)) == 0) &&
-		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\')
+		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\' &&
+		ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 7)
 		)
 	{
 		PSTR logintag = (PSTR)ExAllocatePoolWithTag(PagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
@@ -453,6 +472,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		PSTR procstr = NULL;
 		PSTR timestr = NULL;
 		PSTR sigstr = NULL;
+		PSTR inheritstr = NULL;
 		bool isWChar = false;
 		int bPoint[5];
 		for (UINT a = 0; a < Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t); a++)
@@ -494,12 +514,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				else if (b == 4)
 				{
 					bPoint[4] = a;
+					inheritstr = &logintag[a + 1];
+				}
+				else if (b == 5)
+				{
 					sigstr = &logintag[a + 1];
 				}
 				b++;
 			}
 		}
-		if (isWChar || keyidstr == NULL || procstr == NULL || timestr == NULL || sigstr == NULL)
+		if (isWChar || keyidstr == NULL || procstr == NULL || timestr == NULL || inheritstr == NULL || sigstr == NULL)
 		{
 			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
 			Data->IoStatus.Information = 0;
@@ -526,7 +550,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(cbdContext, 'POC');
 			return FLT_PREOP_COMPLETE;
 		}
-
+		int inherit = atoi(inheritstr);
+		if (inherit > 0)
+		{
+			inherit = 1;
+		}
+		else
+		{
+			inherit = 0;
+		}
 		ExAcquireResourceSharedLite(&HashResource, TRUE);
 		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
 		if (wPubKey == NULL)
@@ -562,7 +594,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExReleaseResourceLite(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
-		for (UINT d = 0; d < 4; d++)
+		for (UINT d = 0; d < 5; d++)
 		{
 			logintag[bPoint[d]] = '\\';
 		}
@@ -577,7 +609,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExReleaseResourceLite(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
-		for (UINT d = 0; d < 4; d++)
+		for (UINT d = 0; d < 5; d++)
 		{
 			logintag[bPoint[d]] = '\0';
 		}
@@ -586,7 +618,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0)
 		{
-			ArvAddRegProc(&filterConfig, procstr, keyid);
+			ArvAddRegProc(&filterConfig, procstr, inherit, keyid);
 		}
 		else if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, RegoutPath, 15 * sizeof(wchar_t)) == 0)
 		{
@@ -647,46 +679,47 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 		dosName.Length = dosName.MaximumLength = volCtx->VolumeName.Length;
 		RtlCopyUnicodeString(&dosName, &volCtx->VolumeName);
-		size_t fullLen = 0;
+		//size_t fullLen = 0;
 		if (dosName.Length && RtlCompareUnicodeString(&dosName, &netVolName, TRUE) == 0)
 		{
 			dosName.Length = dosName.MaximumLength = 2;
+		}
 
 
-			PFLT_FILE_NAME_INFORMATION nameInfo;
-			status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &nameInfo);
-			if (!NT_SUCCESS(status))
+		PFLT_FILE_NAME_INFORMATION nameInfo;
+		status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &nameInfo);
+		if (!NT_SUCCESS(status))
+		{
+			leave;
+		}
+		status = FltParseFileNameInformation(nameInfo);
+		if (!NT_SUCCESS(status))
+		{
+			if (nameInfo!=NULL)
 			{
-				leave;
+				FltReleaseFileNameInformation(nameInfo);
 			}
-			status = FltParseFileNameInformation(nameInfo);
-			if (!NT_SUCCESS(status))
-			{
-				if (nameInfo!=NULL)
-				{
-					FltReleaseFileNameInformation(nameInfo);
-				}
-				leave;
-			}
+			leave;
+		}
 
-			size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
-			fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
-			fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
-			UINT i = 0, j = 0, k = nameInfo->Volume.Length / sizeof(wchar_t);
-			for (i = 0; i < fullLen / sizeof(wchar_t); i++)
+		size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
+		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+		fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
+		UINT i = 0, j = 0, k = nameInfo->Volume.Length / sizeof(wchar_t);
+		for (i = 0; i < fullLen / sizeof(wchar_t); i++)
+		{
+			if (i < dosName.Length / sizeof(wchar_t))
 			{
-				if (i < dosName.Length / sizeof(wchar_t))
-				{
-					fullPath.Buffer[i] = dosName.Buffer[j];
-					j++;
-				}
-				else
-				{
-					fullPath.Buffer[i] = nameInfo->Name.Buffer[k];
-					k++;
-				}
+				fullPath.Buffer[i] = dosName.Buffer[j];
+				j++;
+			}
+			else
+			{
+				fullPath.Buffer[i] = nameInfo->Name.Buffer[k];
+				k++;
 			}
 		}
+		/*}
 		else
 		{
 			size_t fullLen = dosName.Length + Data->Iopb->TargetFileObject->FileName.Length;
@@ -695,7 +728,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			fullPath.MaximumLength = (USHORT)fullLen;
 			RtlAppendUnicodeStringToString(&fullPath, &dosName);
 			RtlAppendUnicodeStringToString(&fullPath, &Data->Iopb->TargetFileObject->FileName);
-		}
+		}*/
 		
 		BOOL flag = FALSE;
 		PRuleEntry pRuleEntry = { 0 };
@@ -716,11 +749,13 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					{
 						fullPath.Length = fpLen;
 						flag = TRUE;
-						if (pPathEntry->isDB)
+						ArvAddRuleEntry2(&ruleEntry2Head, pRuleEntry, pPathEntry->isDB);
+						break;
+						/*if (pPathEntry->isDB)
 						{
 							underDBPath = TRUE;
 						}
-						goto out1;
+						goto out1;*/
 					}
 					fullPath.Length = fpLen;
 				}
@@ -728,8 +763,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			}
 			pListEntry = pListEntry->Flink;
 		}
-
-	out1:
 		if (flag) 
 		{
 			BOOL flag2 = FALSE;
@@ -740,20 +773,26 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			while (pListEntry1 != &procHead)
 			{
 				PProcEntry pProcEntry1 = CONTAINING_RECORD(pListEntry1, ProcEntry, entry);
-				PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
-				while (pListEntry2 != &pRuleEntry->Procs)
+				PLIST_ENTRY pRule2 = ruleEntry2Head.Flink;
+				while (pRule2 != &ruleEntry2Head)
 				{
-					PProcEntry pProcEntry2 = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
-					if (pProcEntry1->ProcID == pProcEntry2->ProcID)
+					PRuleEntry2 pRuleEntry2 = CONTAINING_RECORD(pRule2, RuleEntry2, entry);
+					PLIST_ENTRY pListEntry2 = pRuleEntry2->pRuleEntry->Procs.Flink;
+					while (pListEntry2 != &pRuleEntry2->pRuleEntry->Procs)
 					{
-						flag2 = TRUE;
-						if (underDBPath == TRUE)
+						PProcEntry pProcEntry2 = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
+						if (pProcEntry1->ProcID == pProcEntry2->ProcID)
 						{
-							cbdContext->UnderDBPath = TRUE;
+							flag2 = TRUE;
+							if (pRuleEntry2->underDBPath)
+							{
+								cbdContext->UnderDBPath = TRUE;
+							}
+							goto out2;
 						}
-						goto out2;
+						pListEntry2 = pListEntry2->Flink;
 					}
-					pListEntry2 = pListEntry2->Flink;
+					pRule2 = pRule2->Flink;
 				}
 				pListEntry1 = pListEntry1->Flink;
 			}
@@ -771,7 +810,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						{
 							DbgPrint("[FsFilter:create]allowed system process under system device: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 							InterlockedIncrement64(&pPathEntry->stat.passCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 							}
@@ -780,7 +819,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						{
 							DbgPrint("[FsFilter:create]unallowed process under system device: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 							InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
 							}
@@ -795,7 +834,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						{
 							DbgPrint("[FsFilter:create]allowed system process(readonly): %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 							InterlockedIncrement64(&pPathEntry->stat.passCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 							}
@@ -804,7 +843,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						{
 							DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 							InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
 							}
@@ -821,7 +860,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						if (ProcAllowed(procID))
 						{
 							InterlockedIncrement64(&pPathEntry->stat.passCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 							}
@@ -829,7 +868,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						else
 						{
 							InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
 							}
@@ -843,7 +882,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 						if (MatchReadWriteProcess(callerProcessName))
 						{
 							InterlockedIncrement64(&pPathEntry->stat.passCounter);
-							if (underDBPath)
+							if (cbdContext->UnderDBPath)
 							{
 								InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 							}
@@ -856,7 +895,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 								// deleting a file we need to action
 								if (((FILE_DISPOSITION_INFORMATION*)Data->Iopb->Parameters.SetFileInformation.InfoBuffer)->DeleteFile) {
 									InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-									if (underDBPath)
+									if (cbdContext->UnderDBPath)
 									{
 										InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
 									}
@@ -869,7 +908,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 							case 65:
 								// Process the request according to our needs e.g copy the file
 								InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-								if (underDBPath)
+								if (cbdContext->UnderDBPath)
 								{
 									InterlockedIncrement64(&pPathEntry->stat.blockCounterDB);
 								}
@@ -885,7 +924,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			else
 			{
 				InterlockedIncrement64(&pPathEntry->stat.passCounter);
-				if (underDBPath)
+				if (cbdContext->UnderDBPath)
 				{
 					InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 				}
@@ -1030,6 +1069,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	finally
 	{
 		ExReleaseResourceLite(&HashResource);
+		ArvFreeRuleEntry2(&ruleEntry2Head);
 		if (dosName.Buffer)
 		{
 			ArvFreeUnicodeString(&dosName, 'SOD');
@@ -1558,15 +1598,65 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 			return;
 		}
 		PSTR cProcName = PsGetProcessImageFileName(ChildEprocess);
-		ExAcquireResourceSharedLite(&HashResource, TRUE);
-		UINT ruleID = ArvGetRuleIDByRegProcName(&filterConfig, cProcName);
-		ExReleaseResourceLite(&HashResource);
-		if (ruleID != 0)
+		ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+		PRegProcEntry entry = ArvGetRegProcEntryByRegProcName(&filterConfig, cProcName);
+		if (entry != NULL)
 		{
-			ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
-			ArvMapRule(&filterConfig, ChildId, ruleID);
-			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+			ArvMapRule(&filterConfig, ChildId, entry->Inherit, entry->RuleID);
 		}
+		else
+		{
+			LIST_ENTRY procHead = { 0 };
+			InitializeListHead(&procHead);
+			FindAncestorProcessID(ChildId, &procHead);
+			PLIST_ENTRY pListEntry1 = procHead.Flink;
+			while (pListEntry1 != &procHead)
+			{
+				PProcEntry pProcEntry1 = CONTAINING_RECORD(pListEntry1, ProcEntry, entry);
+				PLIST_ENTRY pListEntry2 = filterConfig.Rules.Flink;
+				while (pListEntry2 != &filterConfig.Rules)
+				{
+					PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry2, RuleEntry, entry);
+					PLIST_ENTRY pListEntry3 = pRuleEntry->Procs.Flink;
+					while (pListEntry3 != &pRuleEntry->Procs)
+					{
+						PProcEntry pProcEntry2 = CONTAINING_RECORD(pListEntry3, ProcEntry, entry);
+						if (pProcEntry1->ProcID == pProcEntry2->ProcID && pProcEntry2->Inherit)
+						{
+							ArvMapRule(&filterConfig, ChildId, FALSE, pRuleEntry->ID);
+							goto out;
+						}
+						pListEntry3 = pListEntry3->Flink;
+					}
+					pListEntry2 = pListEntry2->Flink;
+				}
+				pListEntry1 = pListEntry1->Flink;
+			}
+		out:
+			ArvFreeProcs(&procHead);
+			/*if (ParentId > 0)
+			{
+				PRuleEntry pRuleEntry = { 0 };
+				PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+				while (pListEntry != &filterConfig.Rules)
+				{
+					pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+					PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
+					while (pListEntry2 != &pRuleEntry->Procs)
+					{
+						PProcEntry pProcEntry2 = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
+						if (pProcEntry2->ProcID == ParentId && pProcEntry2->Inherit)
+						{
+							ArvMapRule(&filterConfig, ChildId, FALSE, pRuleEntry->ID);
+							goto out;
+						}
+						pListEntry2 = pListEntry2->Flink;
+					}
+					pListEntry = pListEntry->Flink;
+				}
+			}*/
+		}
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ObDereferenceObject(ChildEprocess);
 	}
 	else
