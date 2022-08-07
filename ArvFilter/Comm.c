@@ -77,15 +77,15 @@ MiniMessage(
 			{
 			case SET_PROC:
 				pOpSetProc = (OpSetProc*)InputBuffer;
-				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				BOOL ret = ArvMapRule(&filterConfig, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]add procID %d: %d - %d\n", ret, pOpSetProc->procID, pOpSetProc->ruleID);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
 			case SET_RULES:
-				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				FilterConfig tmpConfig = { 0 };
 				ArvInitializeFilterConfig(&tmpConfig);
 				tmpConfig.readCount = filterConfig.readCount;
@@ -150,30 +150,30 @@ MiniMessage(
 					filterConfig.Rules.Flink = &filterConfig.Rules;
 					filterConfig.Rules.Blink = &filterConfig.Rules;
 				}
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
 			case SET_DB_CONF:
 				pOpSetDBConf = (OpSetDBConf*)InputBuffer;
-				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				BOOL ret2 = ArvSetDBConf(&filterConfig, pOpSetDBConf->id, pOpSetDBConf->path);
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]set DB conf %d: %d - %ws\n", ret2, pOpSetDBConf->id, pOpSetDBConf->path);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
 			case SET_ALLOW_UNLOAD:
 				pOpSetAllowUnload = (OpSetAllowUnload*)InputBuffer;
-				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				AllowUnload = pOpSetAllowUnload->allow;
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]set allow unload: %d\n", pOpSetAllowUnload->allow);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
 			case GET_STAT:
-				ExAcquireResourceSharedLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 				PRepStat pStats = (PRepStat)OutputBuffer;
 				PRuleEntry pRuleEntry = NULL;
 				PPathEntry pPathEntry = NULL;
@@ -211,14 +211,14 @@ MiniMessage(
 				pStats->Write = filterConfig.writeCount;
 				pStats->ReadDB = filterConfig.readCountDB;
 				pStats->WriteDB = filterConfig.writeCountDB;
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat);
 				break;
 			case SET_CONTROL_PROC:
-				ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				pOpSetControlProc = (OpSetControlProc*)InputBuffer;
 				controlProcID = pOpSetControlProc->controlProcID;
-				ExReleaseResourceLite(&HashResource);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]set procID %d\n", pOpSetControlProc->controlProcID);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);

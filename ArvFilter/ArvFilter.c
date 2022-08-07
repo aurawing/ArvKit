@@ -168,16 +168,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 		goto CtxPreReadCleanup;
 	}
 
-	CtxAcquireResourceShared(streamContext->Resource);
+	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
 	if (streamContext->UnderDBPath)
 	{
 		InterlockedIncrement64(&filterConfig.readCountDB);
 	}
-	CtxReleaseResource(streamContext->Resource);
+	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
-	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 	InterlockedIncrement64(&filterConfig.readCount);
-	ExReleaseResourceLite(&HashResource);
+	ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
 CtxPreReadCleanup:
 	if (streamContext != NULL) {
@@ -225,16 +225,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 		goto CtxPreWriteCleanup;
 	}
 
-	CtxAcquireResourceShared(streamContext->Resource);
+	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
 	if (streamContext->UnderDBPath)
 	{
 		InterlockedIncrement64(&filterConfig.writeCountDB);
 	}
-	CtxReleaseResource(streamContext->Resource);
+	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
-	ExAcquireResourceSharedLite(&HashResource, TRUE);
+	ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 	InterlockedIncrement64(&filterConfig.writeCount);
-	ExReleaseResourceLite(&HashResource);
+	ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
 CtxPreWriteCleanup:
 	if (streamContext != NULL) {
@@ -392,11 +392,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			inherit = 0;
 		}
-		ExAcquireResourceSharedLite(&HashResource, TRUE);
+		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
 		if (wPubKey == NULL)
 		{
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
@@ -424,7 +424,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
 		for (UINT d = 0; d < 4; d++)
@@ -439,12 +439,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
-		ExReleaseResourceLite(&HashResource);
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
-		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+		ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0)
 		{
 			ArvMapRule(&filterConfig, procID, inherit, keyid);
@@ -453,7 +453,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			ArvRemoveProc(&filterConfig, procID, keyid);
 		}
-		ExReleaseResourceLite(&HashResource);
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ExFreePoolWithTag(logintag, 'LGI');
 		ExFreePoolWithTag(pubKey, 'LGI');
 		ExFreePoolWithTag(cbdContext, 'POC');
@@ -559,11 +559,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			inherit = 0;
 		}
-		ExAcquireResourceSharedLite(&HashResource, TRUE);
+		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
 		if (wPubKey == NULL)
 		{
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
@@ -591,7 +591,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
 		for (UINT d = 0; d < 5; d++)
@@ -606,16 +606,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
-			ExReleaseResourceLite(&HashResource);
+			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
 		for (UINT d = 0; d < 5; d++)
 		{
 			logintag[bPoint[d]] = '\0';
 		}
-		ExReleaseResourceLite(&HashResource);
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
-		ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+		ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0)
 		{
 			ArvAddRegProc(&filterConfig, procstr, inherit, keyid);
@@ -632,7 +632,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				ArvFreeRegProc(&filterConfig, procstr);
 			}
 		}
-		ExReleaseResourceLite(&HashResource);
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ExFreePoolWithTag(logintag, 'LGI');
 		ExFreePoolWithTag(pubKey, 'LGI');
 		ExFreePoolWithTag(cbdContext, 'POC');
@@ -641,7 +641,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 
 	try
 	{
-		ExAcquireResourceSharedLite(&HashResource, TRUE);
+		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 		if (filterConfig.Rules.Flink == &filterConfig.Rules)
 		{
 			if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
@@ -1068,7 +1068,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	}
 	finally
 	{
-		ExReleaseResourceLite(&HashResource);
+		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ArvFreeRuleEntry2(&ruleEntry2Head);
 		if (dosName.Buffer)
 		{
@@ -1224,7 +1224,7 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	//  Acquire write acccess to the context
 	//
 
-	CtxAcquireResourceExclusive(streamContext->Resource);
+	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
 	//
 	//  Increment the create count
@@ -1243,7 +1243,7 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	//  Relinquish write acccess to the context
 	//
 
-	CtxReleaseResource(streamContext->Resource);
+	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
 	//
 	//  Quit on failure after we have given up
@@ -1533,7 +1533,7 @@ out1:
 	//  Acquire write acccess to the context
 	//
 
-	CtxAcquireResourceExclusive(streamContext->Resource);
+	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
 	streamContext->UnderDBPath = createContext->UnderDBPath;
 
@@ -1548,7 +1548,7 @@ out1:
 	//  Relinquish write acccess to the context
 	//
 
-	CtxReleaseResource(streamContext->Resource);
+	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
 
 CtxPostSetInfoCleanup:
@@ -1685,10 +1685,10 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 		FltUnregisterFilter(g_minifilterHandle);
 	}
 	PsSetCreateProcessNotifyRoutine(CreateProcessNotify, TRUE);
-	ExAcquireResourceExclusiveLite(&HashResource, TRUE);
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 	ArvFreeRegProcs(&filterConfig);
 	ArvFreeRules(&filterConfig);
-	ExReleaseResourceLite(&HashResource);
+	ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 	ExDeleteResourceLite(&HashResource);
 	FreeAllowedProcs();
 	if (NULL != gDeviceObject)
