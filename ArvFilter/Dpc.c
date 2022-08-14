@@ -165,6 +165,10 @@ NTSTATUS ArvDoCompletionProcessingWhenSafe(
 	if (KeGetCurrentIrql() <= APC_LEVEL)
 	{
 		((ArvSafePostCallback)SafePostCallback)(gDeviceObject, Context);
+		if (Event != NULL)
+		{
+			KeSetEvent(Event, IO_NO_INCREMENT, TRUE);
+		}
 		goto EXIT;
 
 	}

@@ -73,7 +73,7 @@ NTSTATUS InitProcessList()
 	}
 	DbgPrint("retLength =  %u\n", retLength);
 	//…Í«Îø’º‰
-	pProcInfo = ExAllocatePool(NonPagedPool, retLength);
+	pProcInfo = ExAllocatePoolWithTag(NonPagedPool, retLength, 'PPIF');
 	if (!pProcInfo)
 	{
 		DbgPrint("ExAllocatePool error!\n");
@@ -116,7 +116,7 @@ NTSTATUS InitProcessList()
 	{
 		DbgPrint("error code : %u!!!\n", nStatus);
 	}
-	ExFreePool(pProcInfo);
+	ExFreePoolWithTag(pProcInfo, 'PPIF');
 	return nStatus;
 }
 
@@ -228,7 +228,8 @@ Cleanup:
 	}
 	if (sid.Buffer)
 	{
-		ExFreePool(sid.Buffer);
+		RtlFreeUnicodeString(&sid);
+		//ExFreePool(sid.Buffer);
 	}
 	if (NT_SUCCESS(status))
 	{
@@ -263,7 +264,7 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 	
 	//ObDereferenceObject(pProcess);
 
-	sidStringBuffer = ExAllocatePool(NonPagedPool, 512);
+	sidStringBuffer = ExAllocatePoolWithTag(NonPagedPool, 512, 'SSBF');
 	RtlInitEmptyUnicodeString(&sidString, sidStringBuffer, 512);
 
 
@@ -275,6 +276,7 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 	if (!NT_SUCCESS(ntStatus)) {
 		DbgPrint(("GetSID: Could not open process token: %x\n",
 			ntStatus));
+		//ExFreePool(sidStringBuffer);
 		return FALSE;
 	}
 
@@ -290,8 +292,8 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 		ZwClose(tokenHandle);
 		return FALSE;
 	}
-	tokenInfoBuffer = (PTOKEN_USER)ExAllocatePool(NonPagedPool,
-		requiredLength);
+	tokenInfoBuffer = (PTOKEN_USER)ExAllocatePoolWithTag(NonPagedPool,
+		requiredLength, 'TKUR');
 	if (tokenInfoBuffer) {
 		ntStatus = NtQueryInformationToken(tokenHandle, TokenUser,
 			tokenInfoBuffer, requiredLength, &requiredLength);
@@ -300,7 +302,7 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 		DbgPrint(("GetSID: Error getting token information: %x\n",
 			ntStatus));
 		if (tokenInfoBuffer)
-			ExFreePool(tokenInfoBuffer);
+			ExFreePoolWithTag(tokenInfoBuffer, 'TKUR');
 		ZwClose(tokenHandle);
 		return FALSE;
 	}
@@ -318,7 +320,7 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 		User.Sid, FALSE);
 	sidString.Buffer[sidString.Length + 1] = '\0';
 	DbgPrint(("GetSID: sidString = %ws\n", sidString.Buffer));
-	ExFreePool(tokenInfoBuffer);
+	ExFreePoolWithTag(tokenInfoBuffer, 'TKUR');
 	if (!NT_SUCCESS(ntStatus)) {
 		DbgPrint(("GetSID: Unable to convert SID to text: %x\n",
 			ntStatus));

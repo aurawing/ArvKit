@@ -10,7 +10,7 @@ Signature   = "$Windows NT$"
 Class = "Bottom"
 ClassGuid = {21D41938-DAA8-4615-86AE-E37344C18BD8}
 Provider    = %ManufacturerName%
-DriverVer   = 
+DriverVer   = 08/14/2022,1.0.0.0
 CatalogFile = ArvFilter.cat
 
 [DestinationDirs]

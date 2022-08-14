@@ -34,7 +34,7 @@ Return Value:
 	status = FltAllocateContext(g_minifilterHandle,
 		FLT_STREAM_CONTEXT,
 		ARV_STREAM_CONTEXT_SIZE,
-		PagedPool,
+		NonPagedPool,
 		&streamContext);
 
 	if (!NT_SUCCESS(status)) {
@@ -49,7 +49,6 @@ Return Value:
 	//
 
 	RtlZeroMemory(streamContext, ARV_STREAM_CONTEXT_SIZE);
-
 
 	streamContext->FileName = ExAllocatePoolWithTag(NonPagedPool, ARV_MAX_NAME_LENGTH, CTX_STRING_TAG);
 

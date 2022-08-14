@@ -55,6 +55,12 @@ typedef struct _FilterConfig {
 	volatile ULONGLONG writeCountDB;
 } FilterConfig, *PFilterConfig;
 
+typedef struct _ParamData {
+	HANDLE ParentID;
+	HANDLE ChildID;
+	BOOLEAN Create;
+} ParamData, *PParamData;
+
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
 BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
