@@ -223,6 +223,7 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="init.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="uthash.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

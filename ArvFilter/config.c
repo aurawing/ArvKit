@@ -40,6 +40,21 @@ PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWST
 	return pRuleEntry;
 }
 
+PRuleEntry ArvGetRuleEntryByRuleID(PFilterConfig pFilterConfig, UINT ruleID)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
+	while (pListEntry != &pFilterConfig->Rules)
+	{
+		PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		if (pRuleEntry->ID == ruleID)
+		{
+			return pRuleEntry;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return NULL;
+}
+
 PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;

@@ -43,6 +43,7 @@ Environment:
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "uthash.h"
 #include "config.h"
 #include "crypto.h"
 #include "init.h"

@@ -68,6 +68,7 @@ BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvFreeRule(PRuleEntry pRuleEntry);
+PRuleEntry ArvGetRuleEntryByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
 PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
 BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path);
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID, BOOL inherit);
