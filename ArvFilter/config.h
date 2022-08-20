@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windef.h>
+#include "uthash.h"
 
 typedef struct _PathStat {
 	volatile ULONGLONG passCounter;
@@ -29,7 +30,7 @@ typedef struct _RuleEntry {
 	UINT ID;
 	UNICODE_STRING PubKey;
 	LIST_ENTRY Dirs;
-	LIST_ENTRY Procs;
+	//LIST_ENTRY Procs;
 } RuleEntry, *PRuleEntry;
 
 typedef struct _RuleEntry2 {
@@ -55,6 +56,18 @@ typedef struct _FilterConfig {
 	volatile ULONGLONG writeCountDB;
 } FilterConfig, *PFilterConfig;
 
+typedef struct _ProcessFlag {
+	UINT Pid;
+	BOOL Inherit;
+	UINT RuleID;
+	UT_hash_handle hh;
+} ProcessFlag, *PProcessFlag;
+
+typedef struct _ProcessFlags {
+	PProcessFlag Flags;
+	ERESOURCE Res;
+} ProcessFlags, *PProcessFlags;
+
 typedef struct _ParamData {
 	HANDLE ParentID;
 	HANDLE ChildID;
@@ -63,9 +76,9 @@ typedef struct _ParamData {
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
-BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
-BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
-VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);
+//BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
+//BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
+//VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);
 VOID ArvFreeRules(PFilterConfig pFilterConfig);
 VOID ArvFreeRule(PRuleEntry pRuleEntry);
 PRuleEntry ArvGetRuleEntryByRuleID(PFilterConfig pFilterConfig, UINT ruleID);
@@ -81,6 +94,13 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UIN
 BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);
 VOID ArvFreeRegProcs(PFilterConfig pFilterConfig);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);
+
+VOID ArvProcessFlagInit(PProcessFlags pFlags);
+VOID ArvProcessFlagRelease(PProcessFlags pFlags);
+VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID);
+PProcessFlag ArvProcessFlagFind(PProcessFlags pFlags, UINT pid);
+VOID ArvProcessFlagDelete(PProcessFlags pFlags, UINT pid);
+
 VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32]);
 int ArvGetTime();
 ULONG ArvGetUnixTimestamp();

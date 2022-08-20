@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fltKernel.h>
+
 #include "config.h"
 
 #define MIN_SECTOR_SIZE 0x200
@@ -25,6 +26,7 @@ const static ULONG gTraceFlags = 0x00000001;
 extern PFLT_FILTER g_minifilterHandle;
 extern PDEVICE_OBJECT gDeviceObject;
 extern FilterConfig filterConfig;
+extern ProcessFlags processFlags;
 extern ERESOURCE HashResource;
 extern ULONG controlProcID;
 extern BOOL AllowUnload;

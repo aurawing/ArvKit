@@ -77,10 +77,11 @@ MiniMessage(
 			{
 			case SET_PROC:
 				pOpSetProc = (OpSetProc*)InputBuffer;
-				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+				/*ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				BOOL ret = ArvMapRule(&filterConfig, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
-				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-				DbgPrint("[FsFilter:MiniMessage]add procID %d: %d - %d\n", ret, pOpSetProc->procID, pOpSetProc->ruleID);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);*/
+				ArvProcessFlagAdd(&processFlags, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
+				DbgPrint("[FsFilter:MiniMessage]add procID: %d - %d\n", pOpSetProc->procID, pOpSetProc->ruleID);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;
@@ -102,13 +103,13 @@ MiniMessage(
 						PRuleEntry pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
 						if (pRuleEntry->ID == newRuleEntry->ID)
 						{
-							PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
+							/*PLIST_ENTRY pListEntry2 = pRuleEntry->Procs.Flink;
 							while (pListEntry2 != &pRuleEntry->Procs)
 							{
 								PProcEntry ppe = CONTAINING_RECORD(pListEntry2, ProcEntry, entry);
 								ArvAddProc(&newRuleEntry->Procs, ppe->ProcID, ppe->Inherit);
 								pListEntry2 = pListEntry2->Flink;
-							}
+							}*/
 
 							PLIST_ENTRY pListEntry3 = pRuleEntry->Dirs.Flink;
 							while (pListEntry3 != &pRuleEntry->Dirs)
