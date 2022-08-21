@@ -1350,9 +1350,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			//}
 			//else
 			//{
-				if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
-				{
-					if (ProcAllowed(procID))
+			//	if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
+			//	{
+					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName))
 					{
 						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
@@ -1386,37 +1386,37 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 							break;
 						}
 					}
-				}
-				else
-				{
-					if (MatchReadWriteProcess(callerProcessName))
-					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					}
-					else
-					{
-						switch (Data->Iopb->Parameters.SetFileInformation.FileInformationClass) {
-						case FileDispositionInformation:
-						case 64:
-							// deleting a file we need to action
-							if (((FILE_DISPOSITION_INFORMATION*)Data->Iopb->Parameters.SetFileInformation.InfoBuffer)->DeleteFile) {
-								//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-								Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-								Data->IoStatus.Information = 0;
-								status = FLT_PREOP_COMPLETE;
-							}
-							break;
-						case FileRenameInformation:
-						case 65:
-							// Process the request according to our needs e.g copy the file
-							//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-							Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-							Data->IoStatus.Information = 0;
-							status = FLT_PREOP_COMPLETE;
-							break;
-						}
-					}
-				}
+				//}
+				//else
+				//{
+				//	if (MatchReadWriteProcess(callerProcessName))
+				//	{
+				//		DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+				//	}
+				//	else
+				//	{
+				//		switch (Data->Iopb->Parameters.SetFileInformation.FileInformationClass) {
+				//		case FileDispositionInformation:
+				//		case 64:
+				//			// deleting a file we need to action
+				//			if (((FILE_DISPOSITION_INFORMATION*)Data->Iopb->Parameters.SetFileInformation.InfoBuffer)->DeleteFile) {
+				//				//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+				//				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				//				Data->IoStatus.Information = 0;
+				//				status = FLT_PREOP_COMPLETE;
+				//			}
+				//			break;
+				//		case FileRenameInformation:
+				//		case 65:
+				//			// Process the request according to our needs e.g copy the file
+				//			//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+				//			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				//			Data->IoStatus.Information = 0;
+				//			status = FLT_PREOP_COMPLETE;
+				//			break;
+				//		}
+				//	}
+				//}
 			//}
 		}
 	}
