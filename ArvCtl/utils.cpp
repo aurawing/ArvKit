@@ -96,6 +96,18 @@ HRESULT SendSetProcMessage(ULONG procID, UINT ruleID)
 	return hResult;
 }
 
+HRESULT SendSetRegProcsMessage(POpRegProc *regProcs, UINT len)
+{
+	HRESULT hResult = S_OK;
+	OpSetRegProcs msg;
+	memset(&msg, 0, sizeof(OpSetRegProcs));
+	msg.command = SET_REG_PROC;
+	msg.regProcs = regProcs;
+	msg.regProcLen = len;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len)
 {
 	HRESULT hResult = S_OK;
@@ -147,6 +159,20 @@ BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 	MultiByteToWideChar(CP_UTF8, 0, UTF8, -1, pwText, dwUnicodeLen);
 	*strUnicode = pwText;
 	return TRUE;
+}
+
+VOID FreeRegProcList(POpRegProc *pzpRegProcs, int regProcSize)
+{
+	for (int i = 0; i < regProcSize; i++)
+	{
+		POpRegProc pOpRegProc = pzpRegProcs[i];
+		free(pOpRegProc->procName);
+		pOpRegProc->procName = NULL;
+		pOpRegProc->inherit = FALSE;
+		pOpRegProc->ruleID = 0;
+		free(pOpRegProc);
+		pOpRegProc = NULL;
+	}
 }
 
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize)

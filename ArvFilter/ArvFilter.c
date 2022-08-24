@@ -1981,7 +1981,7 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 	ArvFreeRules(&filterConfig);
 	ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 	ExDeleteResourceLite(&HashResource);
-	FreeAllowedProcs();
+	//FreeAllowedProcs();
 	if (NULL != gDeviceObject)
 	{
 		if (NULL != gDeviceObject->DeviceExtension)
@@ -2359,12 +2359,12 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 		RtlZeroMemory(gDeviceObject->DeviceExtension, sizeof(ARV_DEVICE_EXTENSION));
 		ArvInitDpcRoutine();
 
-		status = InitProcessList();
+		/*status = InitProcessList();
 		if (!NT_SUCCESS(status))
 		{
 			DbgPrint("[FsFilter:register]find all existed processes: %d\n", status);
 			__leave;
-		}
+		}*/
 		ArvProcessFlagInit(&processFlags);
 		ArvInitializeFilterConfig(&filterConfig);
 		ExInitializeResourceLite(&HashResource);

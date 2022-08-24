@@ -13,6 +13,7 @@ typedef enum _OpCommand {  //操作命令
 	SET_DB_CONF = 3,
 	SET_ALLOW_UNLOAD = 4,
 	SET_CONTROL_PROC = 5,
+	SET_REG_PROC = 6,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -74,15 +75,29 @@ typedef struct _ArvDiskInfo {
 	ULONGLONG totalFreeBytes;
 } ArvDiskInfo, *PArvDiskInfo;
 
+typedef struct _OpRegProc {
+	PSTR procName;
+	BOOL inherit;
+	UINT ruleID;
+} OpRegProc, *POpRegProc;
+
+typedef struct _OpSetRegProcs {
+	OpCommand command;
+	POpRegProc *regProcs;
+	UINT		regProcLen;
+} OpSetRegProcs, *POpSetRegProcs;
+
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
 HRESULT SendSetControlProcMessage(BOOL disable);
 HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out DWORD *bytesReturned);
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID);
+HRESULT SendSetRegProcsMessage(POpRegProc *regProcs, UINT len);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);
 HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path);
 HRESULT SendAllowUnloadMessage(BOOL allow);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
+VOID FreeRegProcList(POpRegProc *pzpRegProcs, int regProcSize);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
 //VOID Sha256UnicodeString(PWSTR pWStr, BYTE result[SHA256_BLOCK_SIZE]);
 void GetDiskInfo(PArvDiskInfo diskInfo);

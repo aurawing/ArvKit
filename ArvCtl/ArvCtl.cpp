@@ -193,6 +193,14 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	{
 		WriteToLog((char*)"in InitConfig(), parse config.json failed!");
 	}
+	if (InitRegProcConfig())
+	{
+		WriteToLog((char*)"in InitRegProcConfig(), parse regproc.json success!");
+	}
+	else
+	{
+		WriteToLog((char*)"in InitRegProcConfig(), parse regproc.json failed!");
+	}
 	if (InitDaemonConfig())
 	{
 		WriteToLog((char*)"in InitDaemonConfig(), parse daemon.json success!");
@@ -270,6 +278,13 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 	if (!RestartArvFilter())
 	{
 		WriteToLog((char*)"in SvcInit(), restart ArvFilter failed!");
+		fclose(logfile);
+		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
+	if (!ConfigRegProcs())
+	{
+		WriteToLog((char*)"in SvcInit(), config reg procs failed!");
 		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;

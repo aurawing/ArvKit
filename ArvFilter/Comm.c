@@ -3,6 +3,85 @@
 PFLT_PORT     gServerPort;//服务端口
 PFLT_PORT     gClientPort;//客户端口
 
+NTSTATUS RecoveryRegProcs(PFilterConfig pFilterConfig)
+{
+	NTSTATUS nStatus = STATUS_SUCCESS;
+	ULONG retLength;  //缓冲区长度
+	PVOID pProcInfo;
+	PSYSTEM_PROCESSES pProcIndex;
+	PEPROCESS pProcess;
+	NTSTATUS ntStatus = STATUS_SUCCESS;
+	//InitializeListHead(&AllowedProcs);
+	//调用函数，获取进程信息
+	nStatus = ZwQuerySystemInformation(
+		SYSTEMPROCESSINFORMATION,   //获取进程信息,宏定义为5
+		NULL,
+		0,
+		&retLength  //返回的长度，即为我们需要申请的缓冲区的长度
+	);
+	if (!retLength)
+	{
+		DbgPrint("ZwQuerySystemInformation error!\n");
+		return nStatus;
+	}
+	DbgPrint("retLength =  %u\n", retLength);
+	//申请空间
+	pProcInfo = ExAllocatePoolWithTag(NonPagedPool, retLength, 'PPIF');
+	if (!pProcInfo)
+	{
+		DbgPrint("ExAllocatePool error!\n");
+		return STATUS_UNSUCCESSFUL;
+	}
+	nStatus = ZwQuerySystemInformation(
+		SYSTEMPROCESSINFORMATION,   //获取进程信息,宏定义为5
+		pProcInfo,
+		retLength,
+		&retLength
+	);
+	if (NT_SUCCESS(nStatus)/*STATUS_INFO_LENGTH_MISMATCH == nStatus*/)
+	{
+		pProcIndex = (PSYSTEM_PROCESSES)pProcInfo;
+		//第一个进程应该是 pid 为 0 的进程
+		if (pProcIndex->ProcessId == 0)
+			DbgPrint("PID 0 System Idle Process\n");
+		//循环打印所有进程信息,因为最后一天进程的NextEntryDelta值为0，所以先打印后判断
+		do
+		{
+			pProcIndex = (PSYSTEM_PROCESSES)((char*)pProcIndex + pProcIndex->NextEntryDelta);
+			//进程名字字符串处理，防止打印时，出错
+			if (pProcIndex->ProcessName.Buffer == NULL)
+				pProcIndex->ProcessName.Buffer = L"NULL";
+			ntStatus = PsLookupProcessByProcessId((HANDLE)pProcIndex->ProcessId, &pProcess);
+			if (NT_SUCCESS(ntStatus))
+			{
+				char *pStrProcessName = PsGetProcessImageFileName(pProcess);
+				ObDereferenceObject(pProcess);
+				/*if (strcmp(pStrProcessName, "explorer.exe") == 0)
+				{
+					continue;
+				}*/
+				PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
+				while (pListEntry != &pFilterConfig->RegProcs)
+				{
+					PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+					if (strcmp(pRegProcEntry->ProcName, pStrProcessName) == 0)
+					{
+						ArvProcessFlagAdd(&processFlags, pProcIndex->ProcessId, pRegProcEntry->Inherit, pRegProcEntry->RuleID);
+					}
+					pListEntry = pListEntry->Flink;
+				}
+			}
+			DbgPrint("ProcName:  %-20ws     pid:  %u\n", pProcIndex->ProcessName.Buffer, pProcIndex->ProcessId);
+		} while (pProcIndex->NextEntryDelta != 0);
+	}
+	else
+	{
+		DbgPrint("error code : %u!!!\n", nStatus);
+	}
+	ExFreePoolWithTag(pProcInfo, 'PPIF');
+	return nStatus;
+}
+
 //用户态和内核态建立连接
 NTSTATUS
 MiniConnect(
@@ -70,6 +149,7 @@ MiniMessage(
 		OpSetDBConf *pOpSetDBConf = NULL;
 		OpSetAllowUnload *pOpSetAllowUnload = NULL;
 		OpSetControlProc *pOpSetControlProc = NULL;
+		OpSetRegProcs *pOpSetRegProcs = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -82,6 +162,20 @@ MiniMessage(
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);*/
 				ArvProcessFlagAdd(&processFlags, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
 				DbgPrint("[FsFilter:MiniMessage]add procID: %d - %d\n", pOpSetProc->procID, pOpSetProc->ruleID);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_REG_PROC:
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+				pOpSetRegProcs = (OpSetRegProcs*)InputBuffer;
+				ArvFreeRegProcs(&filterConfig);
+				for (UINT i = 0; i < pOpSetRegProcs->regProcLen; i++)
+				{
+					ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->ruleID);
+				}
+				RecoveryRegProcs(&filterConfig);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]refresh reg proc list");
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;

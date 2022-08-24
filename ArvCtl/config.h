@@ -14,10 +14,15 @@ BOOL UpdateSysConfig(UINT listenPort, PSTR keyManageAddr);
 BOOL InitConfig();
 PSTR PrintJsonConfig();
 void ClearConfig();
+BOOL ConfigRegProcs();
 BOOL ConfigArvFilter();
 BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen);
 BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB);
 PSTR LoadDBConf();
+
+BOOL InitRegProcConfig();
+BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add);
+void ClearRegProcConfig();
 
 BOOL InitDaemonConfig();
 BOOL UpdateDaemonConfig(PSTR daemonPath, PSTR exePath, INT keyID, PSTR url);

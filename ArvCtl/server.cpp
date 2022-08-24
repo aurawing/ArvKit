@@ -386,6 +386,23 @@ void process(WFHttpTask *server_task)
 			user_resp->set_status_code("200");
 			user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
 		}
+		else if (ifnamestr == "saveregproc")
+		{
+			cJSON *procNameEntry = cJSON_GetObjectItem(jsonHead, "procName");
+			cJSON *inheritEntry = cJSON_GetObjectItem(jsonHead, "inherit");
+			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
+			cJSON *addEntry = cJSON_GetObjectItem(jsonHead, "add");
+			BOOL ret = UpdateRegProcConfig(procNameEntry->valuestring, cJSON_IsTrue(inheritEntry), keyIDEntry->valueint, cJSON_IsTrue(addEntry));
+			if (ret) {
+				user_resp->set_status_code("200");
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+			}
+			else
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -71, \"msg\": \"parse parameter failed\", \"data\": {}}");
+			}
+		}
 		else
 		{
 			user_resp->set_status_code("450");

@@ -5,6 +5,10 @@ cJSON *jsonConfig = NULL;
 TCHAR configPath[MAX_PATH];
 SRWLOCK configLock;
 
+cJSON *regProcConfig = NULL;
+TCHAR regProcPath[MAX_PATH];
+SRWLOCK regProcLock;
+
 cJSON *daemonConfig = NULL;
 TCHAR daemonPath[MAX_PATH];
 SRWLOCK daemonLock;
@@ -188,6 +192,59 @@ void ClearConfig()
 		jsonConfig = NULL;
 	}
 	ReleaseSRWLockExclusive(&configLock);
+}
+
+BOOL ConfigRegProcs()
+{
+	if (regProcConfig == NULL)
+	{
+		return TRUE;
+	}
+	AcquireSRWLockShared(&regProcLock);
+	int regProcSize = cJSON_GetArraySize(regProcConfig);
+	cJSON *pJsonRegProc;
+	cJSON *pJsonRegProcItem;
+	POpRegProc pRegProc;
+	POpRegProc *pzpRegProcs;
+	HRESULT result = S_OK;
+	if (regProcSize > 0)
+	{
+		pzpRegProcs = (POpRegProc*)malloc(regProcSize * sizeof(POpRegProc));
+		for (int i = 0; i < regProcSize; i++)
+		{
+			pRegProc = (POpRegProc)malloc(sizeof(OpRegProc));
+			pJsonRegProc = cJSON_GetArrayItem(regProcConfig, i);
+
+			pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "procName");
+			pRegProc->procName = (PSTR)malloc(sizeof(char)*(strlen(pJsonRegProcItem->valuestring) + 1));
+			strcpy_s(pRegProc->procName, sizeof(char)*(strlen(pJsonRegProcItem->valuestring) + 1), pJsonRegProcItem->valuestring);
+
+			pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "keyID");
+			pRegProc->ruleID = pJsonRegProcItem->valueint;
+
+			pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "inherit");
+			if (cJSON_IsTrue(pJsonRegProcItem))
+				pRegProc->inherit = TRUE;
+			else if (cJSON_IsFalse(pJsonRegProcItem))
+				pRegProc->inherit = FALSE;
+
+			pzpRegProcs[i] = pRegProc;
+		}
+		result = SendSetRegProcsMessage(pzpRegProcs, regProcSize);
+		FreeRegProcList(pzpRegProcs, regProcSize);
+		free(pzpRegProcs);
+		pzpRegProcs = NULL;
+	}
+
+	ReleaseSRWLockShared(&regProcLock);
+	if (result != S_OK)
+	{
+		return FALSE;
+	}
+	else
+	{
+		return TRUE;
+	}
 }
 
 BOOL ConfigArvFilter()
@@ -401,6 +458,129 @@ PSTR LoadDBConf()
 	ReleaseSRWLockShared(&configLock);
 	str = cJSON_Print(jsonDBConf);
 	return str;
+}
+
+BOOL InitRegProcConfig()
+{
+	InitializeSRWLock(&regProcLock);
+	GetModuleFileName(NULL, regProcPath, MAX_PATH);
+	WCHAR *ch = wcsrchr(regProcPath, '\\');
+	ch[1] = L'r';
+	ch[2] = L'e';
+	ch[3] = L'g';
+	ch[4] = L'p';
+	ch[5] = L'r';
+	ch[6] = L'o';
+	ch[7] = L'c';
+	ch[8] = L'.';
+	ch[9] = L'j';
+	ch[10] = L's';
+	ch[11] = L'o';
+	ch[12] = L'n';
+	ch[13] = L'\0';
+	errno_t err;
+	FILE *fp;
+	int file_size;
+	if (_waccess(regProcPath, 0))
+	{
+		regProcConfig = cJSON_Parse("[]");
+		return TRUE;
+	}
+	err = _wfopen_s(&fp, regProcPath, L"rb");
+	if (err != 0)
+	{
+		regProcConfig = cJSON_Parse("[]");
+		return FALSE;
+	}
+	fseek(fp, 0, SEEK_END);
+	file_size = ftell(fp);
+	char *tmp;
+	fseek(fp, 0, SEEK_SET);
+	size_t allocSize = file_size * sizeof(char) + sizeof(char);
+	tmp = (char *)malloc(allocSize);
+	memset(tmp, 0, allocSize);
+	fread(tmp, sizeof(char), file_size, fp);
+	fclose(fp);
+	AcquireSRWLockExclusive(&regProcLock);
+	regProcConfig = cJSON_Parse(tmp);
+	free(tmp);
+	ReleaseSRWLockExclusive(&regProcLock);
+	if (regProcConfig == NULL)
+	{
+		regProcConfig = cJSON_Parse("[]");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add)
+{
+	AcquireSRWLockExclusive(&regProcLock);
+	if (regProcConfig == NULL)
+	{
+		regProcConfig = cJSON_CreateArray();
+	}
+	int entrySize = cJSON_GetArraySize(regProcConfig);
+	cJSON *pJsonReg;
+	cJSON *pJsonRegItem;
+	int selindex = -1;
+	for (int i = 0; i < entrySize; i++)
+	{
+		pJsonReg = cJSON_GetArrayItem(regProcConfig, i);
+		pJsonRegItem = cJSON_GetObjectItem(pJsonReg, "procName");
+		if (strcmp(pJsonRegItem->valuestring, procName) == 0)
+		{
+			selindex = i;
+			break;
+		}
+	}
+	if (add)
+	{
+		cJSON *item = cJSON_CreateObject();
+		cJSON_AddItemToObject(item, "procName", cJSON_CreateString(procName));
+		cJSON_AddItemToObject(item, "inherit", cJSON_CreateBool(inherit));
+		cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(keyID));
+		if (selindex >= 0)
+		{
+			cJSON_ReplaceItemInArray(regProcConfig, selindex, item);
+		}
+		else
+		{
+			cJSON_AddItemToArray(regProcConfig, item);
+		}
+	}
+	else
+	{
+		if (selindex >= 0)
+		{
+			cJSON_DeleteItemFromArray(regProcConfig, selindex);
+		}
+	}
+
+	errno_t err;
+	FILE *fp;
+	err = _wfopen_s(&fp, regProcPath, L"wb");
+	if (err != 0)
+	{
+		ReleaseSRWLockExclusive(&regProcLock);
+		return FALSE;
+	}
+	PSTR jsonstr = cJSON_Print(regProcConfig);
+	fprintf(fp, jsonstr);
+	fclose(fp);
+	ReleaseSRWLockExclusive(&regProcLock);
+	return TRUE;
+}
+
+void ClearRegProcConfig()
+{
+	AcquireSRWLockExclusive(&regProcLock);
+	if (regProcConfig != NULL)
+	{
+		cJSON_Delete(regProcConfig);
+		regProcConfig = NULL;
+	}
+	ReleaseSRWLockExclusive(&regProcLock);
 }
 
 
