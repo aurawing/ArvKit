@@ -57,3 +57,57 @@ UINT ArvCalculateCharCountWithinUnicodeString(PUNICODE_STRING str, WCHAR c)
 	}
 	return count;
 }
+
+BOOLEAN
+ArvFindSubString(
+	IN PUNICODE_STRING String,
+	IN PUNICODE_STRING SubString
+)
+/*++
+
+Routine Description:
+This routine looks to see if SubString is a substring of String.
+
+Arguments:
+String - the string to search in
+SubString - the substring to find in String
+
+Return Value:
+Returns TRUE if the substring is found in string and FALSE
+otherwise.
+
+--*/
+{
+	ULONG index;
+
+	//
+	// First, check to see if the strings are equal.
+	//
+
+	if (RtlEqualUnicodeString(String, SubString, TRUE)) {
+
+		return TRUE;
+	}
+
+	//
+	// String and SubString aren't equal, so now see if SubString
+	// is in String any where.
+	//
+
+	for (index = 0;
+		index + SubString->Length <= String->Length;
+		index++) {
+
+		if (_wcsnicmp(&String->Buffer[index],
+			SubString->Buffer,
+			(SubString->Length / sizeof(WCHAR))) == 0) {
+
+			//
+			// SubString is found in String, so return TRUE.
+			//
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}

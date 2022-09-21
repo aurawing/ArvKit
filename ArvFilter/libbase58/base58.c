@@ -37,7 +37,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	const unsigned char *b58u = (void*)b58;
 	unsigned char *binu = bin;
 	size_t outisz = (binsz + sizeof(b58_almostmaxint_t) - 1) / sizeof(b58_almostmaxint_t);
-	b58_almostmaxint_t *outi = (b58_almostmaxint_t*)ExAllocatePoolWithTag(PagedPool, outisz * sizeof(b58_almostmaxint_t), 'B58'); //malloc(outisz*sizeof(b58_almostmaxint_t));
+	b58_almostmaxint_t *outi = (b58_almostmaxint_t*)ExAllocatePoolWithTag(NonPagedPool, outisz * sizeof(b58_almostmaxint_t), 'B58'); //malloc(outisz*sizeof(b58_almostmaxint_t));
 	b58_maxint_t t;
 	b58_almostmaxint_t c;
 	size_t i, j;
@@ -161,7 +161,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 		++zcount;
 
 	size = (binsz - zcount) * 138 / 100 + 1;
-	uint8_t *buf = (uint8_t*)ExAllocatePoolWithTag(PagedPool, size * sizeof(uint8_t), 'B58');  //malloc(size*sizeof(uint8_t));
+	uint8_t *buf = (uint8_t*)ExAllocatePoolWithTag(NonPagedPool, size * sizeof(uint8_t), 'B58');  //malloc(size*sizeof(uint8_t));
 	memset(buf, 0, size);
 
 	for (i = zcount, high = size - 1; i < binsz; ++i, high = j)
@@ -199,7 +199,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 
 bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, size_t datasz)
 {
-	uint8_t *buf = (uint8_t*)ExAllocatePoolWithTag(PagedPool, (1 + datasz + 0x20) * sizeof(uint8_t), 'B58'); //malloc((1 + datasz + 0x20)*sizeof(uint8_t));
+	uint8_t *buf = (uint8_t*)ExAllocatePoolWithTag(NonPagedPool, (1 + datasz + 0x20) * sizeof(uint8_t), 'B58'); //malloc((1 + datasz + 0x20)*sizeof(uint8_t));
 	uint8_t *hash = &buf[1 + datasz];
 
 	buf[0] = ver;

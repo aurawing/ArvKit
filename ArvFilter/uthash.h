@@ -71,7 +71,7 @@ do {                                                                            
 #endif
 
 #ifndef uthash_malloc
-#define uthash_malloc(sz) ExAllocatePoolWithTag(PagedPool, sz, 'hash')      /* malloc fcn                      */
+#define uthash_malloc(sz) ExAllocatePoolWithTag(NonPagedPool, sz, 'hash')      /* malloc fcn                      */
 #endif
 #ifndef uthash_free
 #define uthash_free(ptr,sz) ExFreePoolWithTag(ptr, 'hash')     /* free fcn                        */

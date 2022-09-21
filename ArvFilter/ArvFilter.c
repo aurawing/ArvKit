@@ -13,7 +13,12 @@ Environment:
 	Kernel mode
 
 --*/
+
 #include "pch.h"
+
+//#include "Trace.h"
+//#define WPP_GLOBALLOGGER
+//#include "ArvFilter.tmh"
 
 #define BUFFER_SWAP_TAG     'bdBS'
 #define NAME_TAG            'mnBS'
@@ -22,13 +27,14 @@ Environment:
 NTKERNELAPI HANDLE PsGetProcessInheritedFromUniqueProcessId(IN PEPROCESS Process);
 NTKERNELAPI UCHAR* PsGetProcessImageFileName(IN PEPROCESS Process);
 
+//PDRIVER_OBJECT pDriverObject = { 0 };
 ProcessFlags processFlags = { 0 };
 FilterConfig filterConfig = { 0 };
 ERESOURCE HashResource = { 0 };
 ULONG controlProcID = 0;
 PFLT_FILTER g_minifilterHandle = NULL;
 PDEVICE_OBJECT gDeviceObject = NULL;
-BOOL AllowUnload = FALSE;
+BOOL AllowUnload = TRUE;
 
 // 获取全部父进程ID
 VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
@@ -71,11 +77,20 @@ BOOLEAN MatchReadWriteProcess(char *pStrProcessName)
 	}
 	CHAR*  pStrProcessName = PsGetProcessImageFileName(pProcess);
 	ObDereferenceObject(pProcess);*/
-	return strcmp(pStrProcessName, "System") == 0 ||
-		strcmp(pStrProcessName, "Cortana.exe") == 0 ||
-		strcmp(pStrProcessName, "StartMenuExper") == 0 ||
-		strcmp(pStrProcessName, "SearchUI.exe") == 0 ||
-		strcmp(pStrProcessName, "SearchApp.exe") == 0; // strcmp(pStrProcessName, "smartscreen.exe") == 0 || strcmp(pStrProcessName, "smartscreen.ex") == 0;
+	BOOLEAN ret = _stricmp(pStrProcessName, "System") == 0 ||
+		_stricmp(pStrProcessName, "Cortana.exe") == 0 ||
+		_stricmp(pStrProcessName, "StartMenuExper") == 0 ||
+		_stricmp(pStrProcessName, "SearchUI.exe") == 0 ||
+		_stricmp(pStrProcessName, "SearchApp.exe") == 0 ||
+		_stricmp(pStrProcessName, "ShellExperienc") == 0 ||
+		_stricmp(pStrProcessName, "ChsIME.exe") == 0 ||
+		_stricmp(pStrProcessName, "ServerManagerL") == 0 ||
+		_stricmp(pStrProcessName, "ServerManager.") == 0 ||
+		_stricmp(pStrProcessName, "RuntimeBroker.") == 0 ||
+		//_stricmp(pStrProcessName, "DllHost.exe") == 0 ||
+		_stricmp(pStrProcessName, "SystemSettings") == 0 ||
+		_stricmp(pStrProcessName, "WmiPrvSE.exe") == 0;// strcmp(pStrProcessName, "smartscreen.exe") == 0 || strcmp(pStrProcessName, "smartscreen.ex") == 0;
+	return ret;
 }
 
 //判断是否为只读进程
@@ -89,40 +104,40 @@ BOOLEAN MatchReadonlyProcess(char *pStrProcessName)
 	}
 	CHAR*  pStrProcessName = PsGetProcessImageFileName(pProcess);
 	ObDereferenceObject(pProcess);*/
-	return
-		strcmp(pStrProcessName, "System") == 0 ||
-		strcmp(pStrProcessName, "csrss.exe") == 0 ||
-		strcmp(pStrProcessName, "lsass.exe") == 0 ||
-		strcmp(pStrProcessName, "smss.exe") == 0 ||
-		strcmp(pStrProcessName, "sc.exe") == 0 ||
-		strcmp(pStrProcessName, "services.exe") == 0 ||
-		strcmp(pStrProcessName, "MsMpEng.exe") == 0 ||
-		strcmp(pStrProcessName, "dllhost.exe") == 0 ||
-		strcmp(pStrProcessName, "svchost.exe") == 0 ||
-		strcmp(pStrProcessName, "conhost.exe") == 0 ||
+	BOOLEAN ret = //_stricmp(pStrProcessName, "System") == 0 ||
+		//_stricmp(pStrProcessName, "csrss.exe") == 0 ||
+		//_stricmp(pStrProcessName, "lsass.exe") == 0 ||
+		//_stricmp(pStrProcessName, "smss.exe") == 0 ||
+		_stricmp(pStrProcessName, "sc.exe") == 0 ||
+		//_stricmp(pStrProcessName, "services.exe") == 0 ||
+		//_stricmp(pStrProcessName, "MsMpEng.exe") == 0 ||
+		_stricmp(pStrProcessName, "DllHost.exe") == 0 ||
+		_stricmp(pStrProcessName, "svchost.exe") == 0 ||
+		_stricmp(pStrProcessName, "conhost.exe") == 0 ||
 		//strcmp(pStrProcessName, "fodhelper.exe") == 0 || 
-		//strcmp(pStrProcessName, "RuntimeBroker.exe") == 0 || 
+		_stricmp(pStrProcessName, "RuntimeBroker.") == 0 ||
 		//strcmp(pStrProcessName, "SearchUI.exe") == 0 || 
-		//strcmp(pStrProcessName, "ShellExperienceHost.exe") == 0 || 
-		strcmp(pStrProcessName, "sihost.exe") == 0 ||
-		strcmp(pStrProcessName, "smartscreen.ex") == 0 ||
-		strcmp(pStrProcessName, "taskhostw.exe") == 0 ||
-		strcmp(pStrProcessName, "Taskmgr.exe") == 0 ||
+		//_stricmp(pStrProcessName, "ShellExperienc") == 0 ||
+		_stricmp(pStrProcessName, "sihost.exe") == 0 ||
+		_stricmp(pStrProcessName, "smartscreen.ex") == 0 ||
+		_stricmp(pStrProcessName, "taskhostw.exe") == 0 ||
+		_stricmp(pStrProcessName, "Taskmgr.exe") == 0 ||
 		//strcmp(pStrProcessName, "vm3dservice.exe") == 0 || 
-		strcmp(pStrProcessName, "dwm.exe") == 0 ||
-		strcmp(pStrProcessName, "fontdrvhost.ex") == 0 ||
-		strcmp(pStrProcessName, "ChsIME.exe") == 0 ||
-		strcmp(pStrProcessName, "ctfmon.exe") == 0 ||
+		_stricmp(pStrProcessName, "dwm.exe") == 0 ||
+		_stricmp(pStrProcessName, "fontdrvhost.ex") == 0 ||
+		//_stricmp(pStrProcessName, "ChsIME.exe") == 0 ||
+		_stricmp(pStrProcessName, "ctfmon.exe") == 0 ||
 		//strcmp(pStrProcessName, "WindowsInternal.ComposableShell.Experiences,TextInput.InputApp.exe") == 0 || 
-		strcmp(pStrProcessName, "explorer.exe") == 0 ||
-		strcmp(pStrProcessName, "cmd.exe") == 0 ||
-		strcmp(pStrProcessName, "powershell.exe") == 0 ||
-		//strcmp(pStrProcessName, "secretmanager.exe") == 0 ||
-		strcmp(pStrProcessName, "secretmanager.") == 0;
+		_stricmp(pStrProcessName, "Explorer.EXE") == 0 ||
+		_stricmp(pStrProcessName, "cmd.exe") == 0 ||
+		_stricmp(pStrProcessName, "powershell.exe") == 0 ||
+		//_stricmp(pStrProcessName, "arvdaemon.exe") == 0 ||
+		_stricmp(pStrProcessName, "secretmanager.") == 0;
 	/*strcmp(pStrProcessName, "Cortana.exe") == 0 ||
 	strcmp(pStrProcessName, "StartMenuExper") == 0 ||
 	strcmp(pStrProcessName, "SearchUI.exe") == 0 ||
 	strcmp(pStrProcessName, "SearchApp.exe") == 0;*/
+	return ret;
 }
 
 
@@ -251,6 +266,18 @@ CtxPreWriteCleanup:
 	return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
+BOOL ArvIfMatchUnicodeString(PCUNICODE_STRING strs, PCUNICODE_STRING str, UINT len)
+{
+	for (UINT i = 0; i < len; i++)
+	{
+		if (RtlEqualUnicodeString(&strs[i], str, TRUE))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -262,7 +289,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	//
 	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	NTSTATUS status2 = STATUS_SUCCESS;
-	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(PagedPool, sizeof(CreateContext), 'POC');
+	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
 		return status;
@@ -280,6 +307,13 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / 2 - 5] == L'3' &&
 		Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / 2 - 6] == L'2' &&
 		Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / 2 - 7] == L'1')
+	{
+		DbgPrint("hit");
+	}*/
+
+	/*WCHAR MicroCachePath[] = { '\\','U','s','e','r','s','\\','A','d','m','i','n','i','s','t','r','a','t','o','r' };
+	if ((Data->Iopb->TargetFileObject->FileName.Length >= 20 * sizeof(wchar_t)) &&
+		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, MicroCachePath, 20 * sizeof(wchar_t)) == 0))
 	{
 		DbgPrint("hit");
 	}*/
@@ -320,10 +354,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
 		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0) &&
 		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\' &&
-			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 6)
-		)
+			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 6))
 	{
-		PSTR logintag = (PSTR)ExAllocatePoolWithTag(PagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
+		PSTR logintag = (PSTR)ExAllocatePoolWithTag(NonPagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
 		RtlZeroMemory(logintag, Data->Iopb->TargetFileObject->FileName.Length);
 		int b = 0;
 		PSTR keyidstr = NULL;
@@ -382,6 +415,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 		int keyid = atoi(keyidstr);
@@ -391,6 +426,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 
@@ -402,6 +439,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 		int inherit = atoi(inheritStr);
@@ -422,9 +461,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
-		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(PagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
+		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
 		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
 		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
 		{
@@ -445,6 +486,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			pubKey = NULL;
+			cbdContext = NULL;
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
@@ -460,6 +504,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			pubKey = NULL;
+			cbdContext = NULL;
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
@@ -480,15 +527,17 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExFreePoolWithTag(logintag, 'LGI');
 		ExFreePoolWithTag(pubKey, 'LGI');
 		ExFreePoolWithTag(cbdContext, 'POC');
+		logintag = NULL;
+		pubKey = NULL;
+		cbdContext = NULL;
 		return FLT_PREOP_COMPLETE;
 	}
 	else if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
 		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, RegoutPath, 15 * sizeof(wchar_t)) == 0) &&
 		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\' &&
-			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 7)
-		)
+			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 7))
 	{
-		PSTR logintag = (PSTR)ExAllocatePoolWithTag(PagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
+		PSTR logintag = (PSTR)ExAllocatePoolWithTag(NonPagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
 		RtlZeroMemory(logintag, Data->Iopb->TargetFileObject->FileName.Length);
 		int b = 0;
 		PSTR keyidstr = NULL;
@@ -552,6 +601,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 		int keyid = atoi(keyidstr);
@@ -561,6 +612,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 		LONG timeBaseLine = (LONG)ArvGetUnixTimestamp();
@@ -571,6 +624,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
 		int inherit = atoi(inheritstr);
@@ -591,9 +646,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			Data->IoStatus.Information = 0;
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			cbdContext = NULL;
 			return FLT_PREOP_COMPLETE;
 		}
-		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(PagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
+		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
 		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
 		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
 		{
@@ -614,6 +671,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			pubKey = NULL;
+			cbdContext = NULL;
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
@@ -629,6 +689,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			ExFreePoolWithTag(logintag, 'LGI');
 			ExFreePoolWithTag(pubKey, 'LGI');
 			ExFreePoolWithTag(cbdContext, 'POC');
+			logintag = NULL;
+			pubKey = NULL;
+			cbdContext = NULL;
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 			return FLT_PREOP_COMPLETE;
 		}
@@ -659,8 +722,58 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExFreePoolWithTag(logintag, 'LGI');
 		ExFreePoolWithTag(pubKey, 'LGI');
 		ExFreePoolWithTag(cbdContext, 'POC');
+		logintag = NULL;
+		pubKey = NULL;
+		cbdContext = NULL;
 		return FLT_PREOP_COMPLETE;
 	}
+
+	/*if (KeGetCurrentIrql() >= APC_LEVEL)
+	{
+		KeBugCheck(NO_EXCEPTION_HANDLING_SUPPORT);
+	}*/
+	UNICODE_STRING ExpAllow1 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows");
+	UNICODE_STRING ExpAllow2 = RTL_CONSTANT_STRING(L"\\AppData\\Roaming\\Microsoft\\Windows");
+	UNICODE_STRING ExpAllow3 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Temp");
+	UNICODE_STRING ExpAllow4 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\ConnectedDevicesPlatform");
+	UNICODE_STRING ExpAllow5 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft");
+	UNICODE_STRING ExpAllow6 = RTL_CONSTANT_STRING(L"C:\\Windows\\rescache\\_merged");
+	UNICODE_STRING ExpAllow7 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator");
+
+	UNICODE_STRING ExpAllows[24] = {
+		RTL_CONSTANT_STRING(L"C:\\Users"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\ConnectedDevicesPlatform"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Temp"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Roaming"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Windows"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\Desktop"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Public"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Public\\Desktop"),
+		RTL_CONSTANT_STRING(L"C:\\Windows\\rescache\\_merged"),
+		RTL_CONSTANT_STRING(L"C:\\Windows\\system32\\catroot"),
+		RTL_CONSTANT_STRING(L"C:\\Windows\\system32\\catroot2"),
+		RTL_CONSTANT_STRING(L"C:\\ProgramData"),
+		RTL_CONSTANT_STRING(L"C:\\ProgramData\\Microsoft\\Windows\\Start Menu"),
+		RTL_CONSTANT_STRING(L"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs"),
+		RTL_CONSTANT_STRING(L"C:\\ProgramData\\Microsoft\\Windows\\Start Menu Places"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\IconCache.db"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Explorer\\iconcache_idx.db"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Internet Explorer\\Quick Launch"),
+		RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Internet Explorer\\Quick Launch\\User Pinned")
+	};
+
+	UNICODE_STRING ExpAllow20 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCache");
+	UNICODE_STRING ExpAllow21 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\ConnectedDevicesPlatform");
+	UNICODE_STRING ExpAllow22 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Packages");
+	UNICODE_STRING ExpAllow23 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCacheLock.dat");
+	UNICODE_STRING ExpAllow24 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
+	UNICODE_STRING ExpAllow25 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\INetCache");
+
 	PProcessFlag pFlag = { 0 };
 	LIST_ENTRY procHead = { 0 };
 	InitializeListHead(&procHead);
@@ -691,15 +804,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			callerProcessName = PsGetProcessImageFileName(pCallerProcess);
 		}
-
 		UNICODE_STRING netVolName;
 		RtlInitUnicodeString(&netVolName, L"\\Device\\Mup");
-		dosName.Buffer = ExAllocatePoolWithTag(PagedPool, volCtx->VolumeName.Length, 'SOD');
+		dosName.Buffer = ExAllocatePoolWithTag(NonPagedPool, volCtx->VolumeName.Length, 'SOD');
 		if (!dosName.Buffer)
 		{
-			//ExReleaseResourceLite(&HashResource);
-			//ObDereferenceObject(pCallerProcess);
-			//return STATUS_INSUFFICIENT_RESOURCES;
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			leave;
 		}
@@ -723,7 +832,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 
 		size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
-		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
 		fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
 		UINT i = 0, j = 0, k = nameInfo->Volume.Length / sizeof(wchar_t);
 		for (i = 0; i < fullLen / sizeof(wchar_t); i++)
@@ -808,40 +917,63 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 		else
 		{
-			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0)
+			//ArvWriteLog(L"create", &fullPath, procID, callerProcessName, TRUE);
+			ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 			{
-				ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-				if (MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
-				{
-					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-				}
-				else
-				{
-					DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-					Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-					Data->IoStatus.Information = 0;
-					status = FLT_PREOP_COMPLETE;
-				}
+				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
+				//if (MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+				//{
+				//	DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+				//	//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+				//}
+				//else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || RtlPrefixUnicodeString(&ExpAllow5, &fullPath, TRUE) == TRUE))
+				//{
+				//	DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+				//}
+				//else
+				//{
+				//	DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+				//	//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+				//	Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				//	Data->IoStatus.Information = 0;
+				//	status = FLT_PREOP_COMPLETE;
+				//}
 			}
 			else
 			{
+				PPathEntry pathEntry2 = NULL;
 				/*if (Data && Data->Iopb && (Data->Iopb->MajorFunction == IRP_MJ_CREATE))
 				{*/
-				ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+				//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 				if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
 				{
 					//if (ProcAllowed(procID) || (MatchReadonlyProcess(procID) && FILE_OPEN == createDisposition))
 					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 					{
 						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+					}
+					else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || ArvFindSubString(&fullPath, &ExpAllow5) || RtlPrefixUnicodeString(&ExpAllow6, &fullPath, TRUE) == TRUE ) || RtlEqualUnicodeString(&fullPath, &ExpAllow7, TRUE) || ArvIfMatchUnicodeString(ExpAllows, &fullPath, sizeof(ExpAllows)/sizeof(ExpAllows[0])))
+					{
+						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					}
+					else if (RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow22, &fullPath, TRUE) ||  RtlEqualUnicodeString(&fullPath, &ExpAllow23, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow24, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow25, TRUE))
+					{
+						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					}
 					else
 					{
 						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+						if (pathEntry2)
+						{
+							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+							if (pathEntry2->isDB)
+							{
+								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+							}
+						}
 						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 						Data->IoStatus.Information = 0;
 						status = FLT_PREOP_COMPLETE;
@@ -849,7 +981,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				}
 				else
 				{
-					if (MatchReadWriteProcess(callerProcessName) || (MatchReadonlyProcess(callerProcessName) && FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (MatchReadonlyProcess(callerProcessName) && FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 					{
 						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
@@ -857,7 +989,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					else
 					{
 						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
+						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+						if (pathEntry2)
+						{
+							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+							if (pathEntry2->isDB)
+							{
+								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+							}
+						}
 						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 						Data->IoStatus.Information = 0;
 						status = FLT_PREOP_COMPLETE;
@@ -893,6 +1033,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		if (pFlag != NULL)
 		{
 			ExFreePoolWithTag(pFlag, 'pcft');
+			pFlag = NULL;
 		}
 		ArvFreeProcs(&procHead);
 		/*if (status != FLT_PREOP_COMPLETE)
@@ -905,32 +1046,62 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//	{
 		//		//status = FLT_PREOP_SYNCHRONIZE;
 		//		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-		//		//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(PagedPool, sizeof(CreateContext), 'POC');
+		//		//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 		//		//cbdContext->UnderDBPath = underDBPath;
 		//		*CompletionContext = cbdContext;
 		//	}
 		//}
 		//else
 		//{
-			if (status != FLT_PREOP_COMPLETE)
-			{
-				status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-				//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(PagedPool, sizeof(CreateContext), 'POC');
-				//cbdContext->UnderDBPath = underDBPath;
-				*CompletionContext = cbdContext;
-			}
-			//}
+		if (status != FLT_PREOP_COMPLETE)
+		{
+			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+			//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
+			//cbdContext->UnderDBPath = underDBPath;
+			*CompletionContext = cbdContext;
+		}
+		//}
 
 	}
-		if (status == FLT_PREOP_COMPLETE)
-		{
-			ExFreePoolWithTag(cbdContext, 'POC');
-		}
+	if (status == FLT_PREOP_COMPLETE)
+	{
+		ExFreePoolWithTag(cbdContext, 'POC');
+		cbdContext = NULL;
+	}
 	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
 	{
 		ExFreePoolWithTag(cbdContext, 'POC');
+		cbdContext = NULL;
 		status = FLT_PREOP_DISALLOW_FASTIO;
 	}
+
+	//if (status == FLT_PREOP_COMPLETE)
+	//{
+	//	/*UNICODE_STRING AdminPath = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator");
+	//	UNICODE_STRING AdminCachePath = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
+	//	if (RtlCompareUnicodeString(&fullPath, &AdminPath, TRUE) == 0 || RtlCompareUnicodeString(&fullPath, &AdminCachePath, TRUE) == 0)
+	//	{
+	//		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	//	}*/
+	//	ArvWriteLog(L"create", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, FALSE);
+	//	//TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Path: %wZ, Proc: %s, result: %d", &Data->Iopb->TargetFileObject->FileName, callerProcessName, 0);
+	//}
+	//else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	//{
+	//	ArvWriteLog(L"create", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, TRUE);
+	//	//TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Path: %wZ, Proc: %s, result: %d", &Data->Iopb->TargetFileObject->FileName, callerProcessName, 1);
+	//}
+	/*BOOL isFile = FALSE;
+	if (STATUS_SUCCESS == FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &isFile) && isFile)
+	{
+		DbgPrint("hit");
+	}*/
+	/*WCHAR MicroCachePath[] = { '\\','U','s','e','r','s','\\','A','d','m','i','n','i','s','t','r','a','t','o','r' };
+	if (status == FLT_PREOP_COMPLETE && _stricmp(callerProcessName, "SearchUI.exe") == 0 && (Data->Iopb->TargetFileObject->FileName.Length >= 20 * sizeof(wchar_t)) &&
+		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, MicroCachePath, 20 * sizeof(wchar_t)) == 0))
+	{
+		KeBugCheck(NO_EXCEPTION_HANDLING_SUPPORT);
+	}*/
 	return status;
 }
 
@@ -959,6 +1130,11 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	NTSTATUS status;
 	BOOLEAN streamContextCreated;
 	WCHAR FileName[ARV_MAX_NAME_LENGTH] = { 0 };
+
+	if (FlagOn(Flags, FLTFL_POST_OPERATION_DRAINING))
+	{
+		goto CtxPostCreateCleanup;
+	}
 
 	if (STATUS_SUCCESS != Cbd->IoStatus.Status)
 	{
@@ -1122,6 +1298,7 @@ CtxPostCreateCleanup:
 	if (createContext)
 	{
 		ExFreePoolWithTag(createContext, 'POC');
+		createContext = NULL;
 	}
 
 	DbgPrint("[Ctx]: CtxPostCreate -> Exit (Cbd = %p, FileObject = %p, Status = 0x%x)\n",
@@ -1143,7 +1320,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	//
 	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	NTSTATUS status2 = STATUS_SUCCESS;
-	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(PagedPool, sizeof(CreateContext), 'POC');
+	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
 		return status;
@@ -1198,6 +1375,13 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	LIST_ENTRY procHead = { 0 };
 	InitializeListHead(&procHead);
 	FindAncestorProcessID(procID, &procHead);
+
+
+	UNICODE_STRING ExpAllow10 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
+
+	UNICODE_STRING ExpAllow20 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCache");
+	UNICODE_STRING ExpAllow21 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Explorer");
+
 	try
 	{
 		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
@@ -1211,7 +1395,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			&volCtx);
 
 		if (!NT_SUCCESS(status)) {
-			DbgPrint("[FsFilter:create]Error getting volume context, status=%x\n", status);
+			DbgPrint("[FsFilter:setinfo]Error getting volume context, status=%x\n", status);
 			leave;
 		}
 
@@ -1223,7 +1407,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 
 		UNICODE_STRING netVolName;
 		RtlInitUnicodeString(&netVolName, L"\\Device\\Mup");
-		dosName.Buffer = ExAllocatePoolWithTag(PagedPool, volCtx->VolumeName.Length, 'SOD');
+		dosName.Buffer = ExAllocatePoolWithTag(NonPagedPool, volCtx->VolumeName.Length, 'SOD');
 		if (!dosName.Buffer)
 		{
 			status = STATUS_INSUFFICIENT_RESOURCES;
@@ -1249,7 +1433,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		}
 
 		size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
-		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
 		fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
 		UINT i = 0, j = 0, k = nameInfo->Volume.Length / sizeof(wchar_t);
 		for (i = 0; i < fullLen / sizeof(wchar_t); i++)
@@ -1325,7 +1509,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			{
 				InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
 			}
-			DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
+			DbgPrint("[FsFilter:setinfo]unauthorized process: %d - %wZ\n", procID, fullPath);
 
 		}
 		else
@@ -1354,8 +1538,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			//	{
 					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName))
 					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+					}
+					else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (RtlPrefixUnicodeString(&ExpAllow10, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE)))
+					{
+						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					}
+					else if (RtlPrefixUnicodeString(&ExpAllow20, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE))
+					{
+						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					}
 					else
 					{
@@ -1447,6 +1639,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		if (pFlag != NULL)
 		{
 			ExFreePoolWithTag(pFlag, 'pcft');
+			pFlag = NULL;
 		}
 		ArvFreeProcs(&procHead);
 		if (status != FLT_PREOP_COMPLETE)
@@ -1455,13 +1648,23 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			*CompletionContext = cbdContext;
 		}
 	}
-		if (status == FLT_PREOP_COMPLETE)
-		{
-			ExFreePoolWithTag(cbdContext, 'POC');
-		}
+	if (status == FLT_PREOP_COMPLETE)
+	{
+		ExFreePoolWithTag(cbdContext, 'POC');
+		cbdContext = NULL;
+	}
+	/*if (status == FLT_PREOP_COMPLETE)
+	{
+		ArvWriteLog(L"setinfo", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, FALSE);
+	}
+	else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	{
+		ArvWriteLog(L"setinfo", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, TRUE);
+	}*/
 	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
 	{
 		ExFreePoolWithTag(cbdContext, 'POC');
+		cbdContext = NULL;
 		status = FLT_PREOP_DISALLOW_FASTIO;
 	}
 	return status;
@@ -1581,7 +1784,7 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationSetInfoWhenSafe(
 	}
 
 	fullLen = dosName.Length + Cbd->Iopb->TargetFileObject->FileName.Length;
-	fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, fullLen, 'POC');
+	fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
 	fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
 	UINT i = 0, j = 0, k = 0;
 	for (i = 0; i < fullLen / sizeof(wchar_t); i++)
@@ -1706,6 +1909,7 @@ CtxPostSetInfoCleanup:
 	if (createContext)
 	{
 		ExFreePoolWithTag(createContext, 'POC');
+		createContext = NULL;
 	}
 
 	DbgPrint("[Ctx]: CtxPostSetInfo -> Exit (Cbd = %p, FileObject = %p)\n",
@@ -1729,6 +1933,15 @@ FLT_POSTOP_CALLBACK_STATUS PostOperationSetInfo(
 	UNREFERENCED_PARAMETER(Flags);
 
 	FLT_POSTOP_CALLBACK_STATUS Status = FLT_POSTOP_FINISHED_PROCESSING;
+
+	if (FlagOn(Flags, FLTFL_POST_OPERATION_DRAINING))
+	{
+		if (CompletionContext)
+		{
+			ExFreePoolWithTag(CompletionContext, 'POC');
+		}
+		goto EXIT;
+	}
 
 	/*
 	* 如果FO创建失败，不进入PocFindOrCreateStreamContext
@@ -1920,10 +2133,12 @@ EXIT:
 	if (pPFlag)
 	{
 		ExFreePoolWithTag(pPFlag, 'pcft');
+		pPFlag = NULL;
 	}
 	if (pGFlag)
 	{
 		ExFreePoolWithTag(pGFlag, 'pcft');
+		pGFlag = NULL;
 	}
 	
 
@@ -1965,6 +2180,7 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 	// If NULL is specified for this routine, then the filter can never be unloaded.
 	//
 	UNREFERENCED_PARAMETER(Flags);
+	//ArvCleanLog();
 	if (!AllowUnload)
 	{
 		return STATUS_FLT_DO_NOT_DETACH;
@@ -1992,9 +2208,9 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 
 		IoDeleteDevice(gDeviceObject);
 	}
-
 	ArvProcessFlagRelease(&processFlags);
-
+	//WPP_CLEANUP(pDriverObject);
+	ArvCleanLog();
 	return STATUS_SUCCESS;
 }
 
@@ -2333,6 +2549,10 @@ CONST FLT_REGISTRATION g_filterRegistration =
 
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
+	/*pDriverObject = DriverObject;
+	WPP_INIT_TRACING(DriverObject, RegistryPath);
+	TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry,RegPath: %wZ", RegistryPath);*/
+	ArvInitLog(NULL);
 	ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 	NTSTATUS status = STATUS_SUCCESS;
 	PSECURITY_DESCRIPTOR sd = NULL;
@@ -2413,6 +2633,13 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 			__leave;
 		}
 		DbgPrint("[FsFilter:start]start filter handle success\n");
+
+		/*status = ArvInitLog(g_minifilterHandle);
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint("[FsFilter:start]start log writer failed: %d\n", status);
+			__leave;
+		}*/
 	}
 	__finally {
 		if (sd != NULL)
@@ -2444,7 +2671,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	}
 
 
-	/*PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(PagedPool, sizeof(ProcessFlag), 'pcfg');
+	/*PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcessFlag), 'pcfg');
 	pflag->Pid = 2;
 	pflag->Inherit = TRUE;
 	HASH_ADD_INT(processFlags, Pid, pflag);

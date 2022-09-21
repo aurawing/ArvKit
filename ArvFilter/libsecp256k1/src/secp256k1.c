@@ -109,6 +109,7 @@ secp256k1_context* secp256k1_context_create(unsigned int flags) {
     secp256k1_context* ctx = (secp256k1_context*)checked_malloc(&default_error_callback, prealloc_size);
     if (EXPECT(secp256k1_context_preallocated_create(ctx, flags) == NULL, 0)) {
 		ExFreePoolWithTag(ctx, 'LSK');
+		ctx = NULL;
         return NULL;
     }
 
@@ -147,6 +148,7 @@ void secp256k1_context_destroy(secp256k1_context* ctx) {
     if (ctx != NULL) {
         secp256k1_context_preallocated_destroy(ctx);
 		ExFreePoolWithTag(ctx, 'LSK');
+		ctx = NULL;
     }
 }
 

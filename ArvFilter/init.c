@@ -1,5 +1,13 @@
 #include "pch.h"
 
+//HANDLE LogFileHandle = { 0 };
+//PFILE_OBJECT LogFileObject = { 0 };
+//PFLT_INSTANCE LogInstance = { 0 };
+//PFLT_VOLUME LogVolume = { 0 };
+LARGE_INTEGER Offset = { 0 };
+ERESOURCE LogResource = { 0 };
+BOOLEAN bReady = TRUE;
+
 //#define SYSTEMPROCESSINFORMATION 5
 //
 //NTKERNELAPI UCHAR* PsGetProcessImageFileName(IN PEPROCESS Process);
@@ -225,6 +233,7 @@ Cleanup:
 	}
 	if (processUser) {
 		ExFreePoolWithTag(processUser, 'TOK');
+		processUser = NULL;
 	}
 	if (sid.Buffer)
 	{
@@ -302,7 +311,10 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 		DbgPrint(("GetSID: Error getting token information: %x\n",
 			ntStatus));
 		if (tokenInfoBuffer)
+		{
 			ExFreePoolWithTag(tokenInfoBuffer, 'TKUR');
+			tokenInfoBuffer = NULL;
+		}
 		ZwClose(tokenHandle);
 		return FALSE;
 	}
@@ -321,6 +333,7 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 	sidString.Buffer[sidString.Length + 1] = '\0';
 	DbgPrint(("GetSID: sidString = %ws\n", sidString.Buffer));
 	ExFreePoolWithTag(tokenInfoBuffer, 'TKUR');
+	tokenInfoBuffer = NULL;
 	if (!NT_SUCCESS(ntStatus)) {
 		DbgPrint(("GetSID: Unable to convert SID to text: %x\n",
 			ntStatus));
@@ -340,3 +353,328 @@ BOOLEAN ProcAllowed2(ULONG ProcID)
 //{
 //	ArvFreeProcs(&AllowedProcs);
 //}
+
+PFLT_INSTANCE
+XBFltGetVolumeInstance(
+	IN PFLT_FILTER		pFilter,
+	IN PUNICODE_STRING	pVolumeName
+)
+{
+	NTSTATUS		status;
+	PFLT_INSTANCE	pInstance = NULL;
+	PFLT_VOLUME		pVolumeList[256];
+	BOOLEAN			bDone = FALSE;
+	ULONG			uRet;
+	UNICODE_STRING	uniName = { 0 };
+	ULONG 			index = 0;
+	WCHAR			wszNameBuffer[MAX_PATH] = { 0 };
+
+	status = FltEnumerateVolumes(pFilter,
+		NULL,
+		0,
+		&uRet);
+	if (status != STATUS_BUFFER_TOO_SMALL)
+	{
+		return NULL;
+	}
+
+	status = FltEnumerateVolumes(pFilter,
+		pVolumeList,
+		uRet,
+		&uRet);
+
+	if (!NT_SUCCESS(status))
+	{
+
+		return NULL;
+	}
+	uniName.Buffer = wszNameBuffer;
+
+	if (uniName.Buffer == NULL)
+	{
+		for (index = 0; index < uRet; index++)
+			FltObjectDereference(pVolumeList[index]);
+
+		return NULL;
+	}
+
+	uniName.MaximumLength = MAX_PATH * sizeof(WCHAR);
+
+	for (index = 0; index < uRet; index++)
+	{
+		uniName.Length = 0;
+
+		status = FltGetVolumeName(pVolumeList[index],
+			&uniName,
+			NULL);
+
+		if (!NT_SUCCESS(status))
+			continue;
+
+		if (RtlCompareUnicodeString(&uniName,
+			pVolumeName,
+			TRUE) != 0)
+			continue;
+
+		status = FltGetVolumeInstanceFromName(pFilter,
+			pVolumeList[index],
+			NULL,
+			&pInstance);
+
+		if (NT_SUCCESS(status))
+		{
+			FltObjectDereference(pInstance);
+			break;
+		}
+	}
+
+	for (index = 0; index < uRet; index++)
+		FltObjectDereference(pVolumeList[index]);
+	return pInstance;
+}
+
+VOID ArvCleanLog()
+{
+	/*if (LogVolume)
+	{
+		FltObjectDereference(LogVolume);
+	}
+	if (LogInstance)
+	{
+		FltObjectDereference(LogInstance);
+	}
+	if (LogFileObject)
+	{
+		FltClose(LogFileHandle);
+		ObDereferenceObject(LogFileObject);
+	}*/
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&LogResource);
+	bReady = FALSE;
+	ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+	ExDeleteResourceLite(&LogResource);
+}
+
+NTSTATUS ArvInitLog(PFLT_FILTER pFilter)
+{
+	ExInitializeResourceLite(&LogResource);
+
+
+
+	////HANDLE SourceFileHandle = NULL;      //源文件句柄
+	////HANDLE TargetFileHandle = NULL;      //目标文件句柄
+	//NTSTATUS Status = STATUS_SUCCESS;    //返回状态
+	//OBJECT_ATTRIBUTES ObjectAttributes;  //OBJECT_ATTRIBUTES结构
+	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\C:\\filter.log"); //源文件
+	////UNICODE_STRING TargetFilePath = RTL_CONSTANT_STRING(L"\\??\\c:\\target.txt"); //目标文件
+	////UNICODE_STRING String = { 0 };           //指向Buffer
+	//IO_STATUS_BLOCK IoStatusBlock;         //返回结果状态结构体
+	////PVOID Buffer = NULL;                   //buffer指针
+	////USHORT Length = 0;                     //要读写的长度
+	////LARGE_INTEGER Offset = { 0 };            //要读写的偏移
+
+	//ExInitializeResourceLite(&LogResource);
+	////初始化OBJECT_ATTRIBUTES结构体
+	//InitializeObjectAttributes(
+	//	&ObjectAttributes,
+	//	&LogFilePath,
+	//	OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+	//	NULL,
+	//	NULL);
+
+	////以FILE_OVERWRITE_IF方式打开
+	//Status = FltCreateFile(
+	//	pFilter,
+	//	NULL,
+	//	&LogFileHandle,
+	//	&LogFileObject,
+	//	GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE,
+	//	&ObjectAttributes,
+	//	&IoStatusBlock,
+	//	NULL,
+	//	FILE_ATTRIBUTE_NORMAL,
+	//	FILE_SHARE_READ,
+	//	FILE_OVERWRITE_IF,
+	//	FILE_NON_DIRECTORY_FILE | FILE_RANDOM_ACCESS | FILE_SYNCHRONOUS_IO_NONALERT,
+	//	NULL,
+	//	0,
+	//	0);
+	//if (!NT_SUCCESS(Status))
+	//{
+	//	DbgPrint("Open source file fault !! - %#x\n", Status);
+	//	return Status;
+	//}
+	//if (LogFileObject)
+	//{
+	//	Status = FltGetVolumeFromFileObject(pFilter, LogFileObject, &LogVolume);
+	//	if (NT_SUCCESS(Status))
+	//	{
+	//		Status = FltGetVolumeInstanceFromName(pFilter, LogVolume, NULL, &LogInstance);
+	//	}
+	//}
+	//if (!NT_SUCCESS(Status))
+	//{
+	//	ArvCleanLog();
+	//}
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR processName, BOOLEAN pass)
+{
+	HANDLE LogFileHandle = { 0 };
+	PFILE_OBJECT LogFileObject = { 0 };
+	PFLT_INSTANCE LogFileInstance = { 0 };
+	PFLT_VOLUME LogVolume = { 0 };
+	NTSTATUS Status = STATUS_SUCCESS;
+	OBJECT_ATTRIBUTES ObjectAttributes;  //OBJECT_ATTRIBUTES结构
+	UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\C:\\filter.log"); //源文件
+	UNICODE_STRING  LogVolumeName = RTL_CONSTANT_STRING(L"\\Device\\HarddiskVolume2");
+	PVOID Buffer = NULL;
+	UNICODE_STRING String = { 0 };
+	IO_STATUS_BLOCK IoStatusBlock;
+	//ExInitializeResourceLite(&LogResource);
+	//初始化OBJECT_ATTRIBUTES结构体
+
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&LogResource);
+	if (!bReady)
+	{
+		goto CLEAN;
+	}
+	InitializeObjectAttributes(
+		&ObjectAttributes,
+		&LogFilePath,
+		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+		NULL,
+		NULL);
+	
+	LogFileInstance = XBFltGetVolumeInstance(g_minifilterHandle, &LogVolumeName);
+	//以FILE_OVERWRITE_IF方式打开
+	Status = FltCreateFile(
+		g_minifilterHandle,
+		LogFileInstance,
+		&LogFileHandle,
+		FILE_APPEND_DATA | SYNCHRONIZE,
+		&ObjectAttributes,
+		&IoStatusBlock,
+		NULL,
+		FILE_ATTRIBUTE_NORMAL,
+		FILE_SHARE_READ,
+		FILE_OPEN_IF,
+		FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+		NULL,
+		NULL,
+		NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		DbgPrint("Open source file fault !! - %#x\n", Status);
+		goto CLEAN;
+	}
+	/*if (LogFileObject)
+	{
+		Status = FltGetVolumeFromFileObject(g_minifilterHandle, LogFileObject, &LogVolume);
+		if (NT_SUCCESS(Status))
+		{
+			Status = FltGetVolumeInstanceFromName(g_minifilterHandle, LogVolume, NULL, &LogInstance);
+		}
+	}
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}*/
+	
+	Status = ObReferenceObjectByHandle(LogFileHandle, 0, NULL, KernelMode, &LogFileObject, NULL);
+
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+
+
+
+	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\D:\\arv\\filter.log");
+	
+	
+	Buffer = (PWCHAR)ExAllocatePoolWithTag(NonPagedPool, 1024, 'LogT');
+	if (NULL == Buffer)
+	{
+		goto CLEAN;
+	}
+	//初始化字符串指针
+	RtlInitEmptyUnicodeString(&String, Buffer, 512 * sizeof(WCHAR));
+	//拷贝字符串
+	RtlAppendUnicodeToString(&String, type);
+	RtlAppendUnicodeToString(&String, L" - ");
+	RtlAppendUnicodeStringToString(&String, path);
+	RtlAppendUnicodeToString(&String, L" - ");
+	char intbuf[16];
+	UNICODE_STRING procIDStr;
+	RtlInitEmptyUnicodeString(&procIDStr, intbuf, 16);
+	RtlIntegerToUnicodeString(procID, 10, &procIDStr);
+	RtlAppendUnicodeStringToString(&String, &procIDStr);
+	RtlAppendUnicodeToString(&String, L" - ");
+	//追加Unicode变量
+	UNICODE_STRING uniProcess = { 0 };
+
+	ANSI_STRING AnsiString;
+	RtlInitAnsiString(&AnsiString, processName);
+
+	char buf[128];
+	RtlInitEmptyUnicodeString(&uniProcess, buf, 128);
+	RtlAnsiStringToUnicodeString(&uniProcess, &AnsiString, FALSE);
+	RtlAppendUnicodeStringToString(&String, &uniProcess);
+	if (pass)
+	{
+		RtlAppendUnicodeToString(&String, L" - yes\n");
+	}
+	else
+	{
+		RtlAppendUnicodeToString(&String, L" - no\n");
+	}
+
+	FILE_STANDARD_INFORMATION fileInfo = { 0 };
+	Status = FltQueryInformationFile(LogFileInstance, LogFileObject, &fileInfo, sizeof(fileInfo), FileStandardInformation, NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+	
+	//写入文件
+	USHORT Length = String.Length;
+	Status = FltWriteFile(
+		LogFileInstance,
+		LogFileObject,
+		&fileInfo.EndOfFile,
+		Length,
+		Buffer,
+		NULL,
+		NULL,
+		NULL,
+		NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		DbgPrint("写入源文件失败!!\n - %#X", Status);
+	}
+	else
+	{
+		Offset.QuadPart += Length;
+	}
+CLEAN:
+	if (LogVolume)
+	{
+		FltObjectDereference(LogVolume);
+	}
+	if (LogFileInstance)
+	{
+		FltObjectDereference(LogFileInstance);
+	}
+	if (LogFileObject)
+	{
+		FltClose(LogFileHandle);
+		ObDereferenceObject(LogFileObject);
+	}
+	if (Buffer)
+	{
+		ExFreePool(Buffer);
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+	return Status;
+}

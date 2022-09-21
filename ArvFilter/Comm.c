@@ -79,6 +79,7 @@ NTSTATUS RecoveryRegProcs(PFilterConfig pFilterConfig)
 		DbgPrint("error code : %u!!!\n", nStatus);
 	}
 	ExFreePoolWithTag(pProcInfo, 'PPIF');
+	pProcInfo = NULL;
 	return nStatus;
 }
 

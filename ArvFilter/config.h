@@ -104,3 +104,5 @@ VOID ArvProcessFlagDelete(PProcessFlags pFlags, UINT pid);
 VOID Sha256UnicodeString(PUNICODE_STRING pUniStr, BYTE result[32]);
 int ArvGetTime();
 ULONG ArvGetUnixTimestamp();
+
+PPathEntry ArvFindPathByPrefix(PFilterConfig pFilterConfig, PUNICODE_STRING path);

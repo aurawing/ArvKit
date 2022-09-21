@@ -100,90 +100,110 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "saveconf2")
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
-			int id = idEntry->valueint;
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
-			PSTR url = urlEntry->valuestring;
 			cJSON *pkEntry = cJSON_GetObjectItem(jsonHead, "pubkey");
-			PSTR pubkey = pkEntry->valuestring;
-			if (!VerifyPublicKey(pubkey))
+			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
+			if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL)
 			{
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -22, \"msg\": \"wrong format of public key\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -23, \"msg\": \"id/pubkey/path must exist\", \"data\": {}}");
 			}
 			else
 			{
-				cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
-				int pathLen = cJSON_GetArraySize(pathEntry);
-				if (id > 0 && pathLen > 0)
+				int id = idEntry->valueint;
+				PSTR urlStr = (PSTR)"";
+				if (urlEntry != NULL)
 				{
-					BOOL flag = TRUE;
-					PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
-					BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
-					for (int i = 0; i < pathLen; i++)
+					urlStr = urlEntry->valuestring;
+				}
+				PSTR pubkey = pkEntry->valuestring;
+				if (!VerifyPublicKey(pubkey))
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -22, \"msg\": \"wrong format of public key\", \"data\": {}}");
+				}
+				else
+				{
+					int pathLen = cJSON_GetArraySize(pathEntry);
+					if (id > 0 && pathLen > 0)
 					{
-						cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
-						cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
-						cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
-						if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+						BOOL flag = TRUE;
+						PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
+						BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
+						for (int i = 0; i < pathLen; i++)
 						{
-							flag = false;
-							break;
+							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
+							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
+							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+							if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+							{
+								flag = false;
+								break;
+							}
+							paths[i] = pJsonPath->valuestring;
+							if (cJSON_IsTrue(pJsonIsDB))
+								isDBs[i] = TRUE;
+							else if (cJSON_IsFalse(pJsonIsDB))
+								isDBs[i] = FALSE;
 						}
-						paths[i] = pJsonPath->valuestring;
-						if (cJSON_IsTrue(pJsonIsDB))
-							isDBs[i] = TRUE;
-						else if (cJSON_IsFalse(pJsonIsDB))
-							isDBs[i] = FALSE;
-					}
-					if (flag)
-					{
-						UpdateConfig(id, pubkey, url, paths, isDBs, pathLen);
-						free(paths);
-						free(isDBs);
-						user_resp->set_status_code("200");
-						char* jsonstr = PrintJsonConfig();
-						if (jsonstr != NULL)
+						if (flag)
 						{
-							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
-							user_resp->append_output_body(jsonstr);
-							user_resp->append_output_body("}");
-							free(jsonstr);
+							UpdateConfig(id, pubkey, urlStr, paths, isDBs, pathLen);
+							free(paths);
+							free(isDBs);
+							user_resp->set_status_code("200");
+							char* jsonstr = PrintJsonConfig();
+							if (jsonstr != NULL)
+							{
+								user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": ");
+								user_resp->append_output_body(jsonstr);
+								user_resp->append_output_body("}");
+								free(jsonstr);
+							}
+							else
+							{
+								user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+							}
 						}
 						else
 						{
-							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+							free(paths);
+							free(isDBs);
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
 						}
 					}
 					else
 					{
-						free(paths);
-						free(isDBs);
 						user_resp->set_status_code("500");
-						user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
+						user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
 					}
-				}
-				else
-				{
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
 				}
 			}
 		}
 		else if (ifnamestr == "savedbconf")
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
-			int id = idEntry->valueint;
 			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
-			BOOL ret = UpdateDBPath(id, pathEntry->valuestring, TRUE);
-			if (ret)
+			if (idEntry == NULL || pathEntry == NULL)
 			{
-				user_resp->set_status_code("200");
-				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -31, \"msg\": \"id/path must exist\", \"data\": {}}");
 			}
 			else
 			{
-				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -30, \"msg\": \"parse parameter failed\", \"data\": {}}");
+				int id = idEntry->valueint;
+				BOOL ret = UpdateDBPath(id, pathEntry->valuestring, TRUE);
+				if (ret)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -30, \"msg\": \"parse parameter failed\", \"data\": {}}");
+				}
 			}
 		}
 		else if (ifnamestr == "loadconf2")
@@ -234,61 +254,69 @@ void process(WFHttpTask *server_task)
 			cJSON *exeNameEntry = cJSON_GetObjectItem(jsonHead, "exeName");
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
-			PWSTR dpath = NULL;
-			PWSTR epath = NULL;
-			UTF8ToUnicode(daemonNameEntry->valuestring, &dpath);
-			UTF8ToUnicode(exeNameEntry->valuestring, &epath);
-			FILE *fp;
-			errno_t err = _wfopen_s(&fp, epath, L"rb");
-			if (err > 0) {
+			if (daemonNameEntry == NULL || exeNameEntry == NULL || keyIDEntry == NULL || urlEntry == NULL)
+			{
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -43, \"msg\": \"source file not exist\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -44, \"msg\": \"daemonName/exeName/keyID/url must exist\", \"data\": {}}");
 			}
 			else
 			{
-				int len = CopyByBlock(dpath, daemonExePath);
-				if (len < 0)
-				{
-					if (len == -2)
-					{
-						user_resp->set_status_code("500");
-						user_resp->append_output_body("{\"code\": -42, \"msg\": \"arvdaemon file not exist\", \"data\": {}}");
-					}
-					else
-					{
-						user_resp->set_status_code("500");
-						user_resp->append_output_body("{\"code\": -40, \"msg\": \"copy daemon failed\", \"data\": {}}");
-					}
+				PWSTR dpath = NULL;
+				PWSTR epath = NULL;
+				UTF8ToUnicode(daemonNameEntry->valuestring, &dpath);
+				UTF8ToUnicode(exeNameEntry->valuestring, &epath);
+				FILE *fp;
+				errno_t err = _wfopen_s(&fp, epath, L"rb");
+				if (err > 0) {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -43, \"msg\": \"source file not exist\", \"data\": {}}");
 				}
 				else
 				{
-					BOOL ret = UpdateDaemonConfig(daemonNameEntry->valuestring, exeNameEntry->valuestring, keyIDEntry->valueint, urlEntry->valuestring);
-					if (ret) {
-						//char *jsonstr = PrintDaemonConfig(NULL);
-						user_resp->set_status_code("200");
-						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
-						//user_resp->append_output_body(jsonstr);
-						//user_resp->append_output_body("}");
-						//free(jsonstr);
+					int len = CopyByBlock(dpath, daemonExePath);
+					if (len < 0)
+					{
+						if (len == -2)
+						{
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -42, \"msg\": \"arvdaemon file not exist\", \"data\": {}}");
+						}
+						else
+						{
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -40, \"msg\": \"copy daemon failed\", \"data\": {}}");
+						}
 					}
 					else
 					{
-						user_resp->set_status_code("500");
-						user_resp->append_output_body("{\"code\": -41, \"msg\": \"parse parameter failed\", \"data\": {}}");
+						BOOL ret = UpdateDaemonConfig(daemonNameEntry->valuestring, exeNameEntry->valuestring, keyIDEntry->valueint, urlEntry->valuestring);
+						if (ret) {
+							//char *jsonstr = PrintDaemonConfig(NULL);
+							user_resp->set_status_code("200");
+							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+							//user_resp->append_output_body(jsonstr);
+							//user_resp->append_output_body("}");
+							//free(jsonstr);
+						}
+						else
+						{
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -41, \"msg\": \"parse parameter failed\", \"data\": {}}");
+						}
 					}
 				}
-			}
-			if (fp != NULL)
-			{
-				fclose(fp);
-			}
-			if (dpath != NULL)
-			{
-				free(dpath);
-			}
-			if (epath != NULL)
-			{
-				free(epath);
+				if (fp != NULL)
+				{
+					fclose(fp);
+				}
+				if (dpath != NULL)
+				{
+					free(dpath);
+				}
+				if (epath != NULL)
+				{
+					free(epath);
+				}
 			}
 		}
 		else if (ifnamestr == "loaddaemonconf")
@@ -326,7 +354,12 @@ void process(WFHttpTask *server_task)
 				port = portEntry->valueint;
 			}
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
-			BOOL ret = UpdateSysConfig(port, urlEntry->valuestring);
+			PSTR urlStr = (PSTR)"";
+			if (urlEntry != NULL)
+			{
+				urlStr = urlEntry->valuestring;
+			}
+			BOOL ret = UpdateSysConfig(port, urlStr);
 			if (ret)
 			{
 				HKEY hKey = NULL;
@@ -392,15 +425,24 @@ void process(WFHttpTask *server_task)
 			cJSON *inheritEntry = cJSON_GetObjectItem(jsonHead, "inherit");
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
 			cJSON *addEntry = cJSON_GetObjectItem(jsonHead, "add");
-			BOOL ret = UpdateRegProcConfig(procNameEntry->valuestring, cJSON_IsTrue(inheritEntry), keyIDEntry->valueint, cJSON_IsTrue(addEntry));
-			if (ret) {
-				user_resp->set_status_code("200");
-				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+
+			if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || addEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -72, \"msg\": \"procName/inherit/keyID/add must exist\", \"data\": {}}");
 			}
 			else
 			{
-				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -71, \"msg\": \"parse parameter failed\", \"data\": {}}");
+				BOOL ret = UpdateRegProcConfig(procNameEntry->valuestring, cJSON_IsTrue(inheritEntry), keyIDEntry->valueint, cJSON_IsTrue(addEntry));
+				if (ret) {
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -71, \"msg\": \"parse parameter failed\", \"data\": {}}");
+				}
 			}
 		}
 		else

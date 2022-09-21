@@ -9,11 +9,11 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen)
 {
-	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(PagedPool, sizeof(RuleEntry), 'RLE');
+	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(RuleEntry), 'RLE');
 	RtlZeroMemory(pRuleEntry, sizeof(RuleEntry));
 	pRuleEntry->ID = id;
 	size_t pubKeyLen = wcslen(pubKey);
-	pRuleEntry->PubKey.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, pubKeyLen * sizeof(wchar_t), 'RLE');
+	pRuleEntry->PubKey.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, pubKeyLen * sizeof(wchar_t), 'RLE');
 	for (UINT i = 0; i < pubKeyLen; i++)
 	{
 		pRuleEntry->PubKey.Buffer[i] = pubKey[i];
@@ -24,9 +24,9 @@ PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWST
 	{
 		PWSTR path = paths[j];
 		size_t pathLen = wcslen(path);
-		PPathEntry pPathEntry = (PPathEntry)ExAllocatePoolWithTag(PagedPool, sizeof(PathEntry), 'PTE');
+		PPathEntry pPathEntry = (PPathEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(PathEntry), 'PTE');
 		RtlZeroMemory(pPathEntry, sizeof(PathEntry));
-		pPathEntry->Path.Buffer = (PWSTR)ExAllocatePoolWithTag(PagedPool, pathLen * sizeof(wchar_t), 'PTE');
+		pPathEntry->Path.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, pathLen * sizeof(wchar_t), 'PTE');
 		for (UINT k = 0; k < pathLen; k++)
 		{
 			pPathEntry->Path.Buffer[k] = path[k];
@@ -89,7 +89,7 @@ PUNICODE_STRING ArvGetPubKeyByRuleID(PFilterConfig pFilterConfig, UINT ruleID)
 //				}
 //				pListEntry2 = pListEntry2->Flink;
 //			}
-//			PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'FME');
+//			PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcEntry), 'FME');
 //			RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 //			pProcEntry->ProcID = procID;
 //			pProcEntry->Inherit = inherit;
@@ -176,6 +176,7 @@ VOID ArvFreeRule(PRuleEntry pRuleEntry)
 		ArvFreeUnicodeString(&pPathEntry->Path, 'PTE');
 		pPathEntry->isDB = FALSE;
 		ExFreePoolWithTag(pPathEntry, 'PTE');
+		pPathEntry = NULL;
 	}
 	/*while (pRuleEntry->Procs.Flink != &pRuleEntry->Procs)
 	{
@@ -185,6 +186,7 @@ VOID ArvFreeRule(PRuleEntry pRuleEntry)
 		ExFreePoolWithTag(pProcEntry, 'FME');
 	}*/
 	ExFreePoolWithTag(pRuleEntry, 'RLE');
+	pRuleEntry = NULL;
 }
 
 BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path)
@@ -215,7 +217,7 @@ BOOL ArvSetDBConf(PFilterConfig pFilterConfig, UINT ruleID, PWSTR path)
 
 VOID ArvAddProc(PLIST_ENTRY pHead, ULONG procID, BOOL inherit)
 {
-	PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(ProcEntry), 'RLE');
+	PProcEntry pProcEntry = (PProcEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcEntry), 'RLE');
 	RtlZeroMemory(pProcEntry, sizeof(ProcEntry));
 	pProcEntry->ProcID = procID;
 	pProcEntry->Inherit = inherit;
@@ -230,12 +232,13 @@ VOID ArvFreeProcs(PLIST_ENTRY pHead)
 		PProcEntry pProcEntry = CONTAINING_RECORD(pDelProcEntry, ProcEntry, entry);
 		pProcEntry->ProcID = 0;
 		ExFreePoolWithTag(pProcEntry, 'POC');
+		pProcEntry = NULL;
 	}
 }
 
 VOID ArvAddRuleEntry2(PLIST_ENTRY pHead, PRuleEntry entry, BOOL underDBPath)
 {
-	PRuleEntry2 pRuleEntry2 = (PRuleEntry2)ExAllocatePoolWithTag(PagedPool, sizeof(RuleEntry2), 'RLE');
+	PRuleEntry2 pRuleEntry2 = (PRuleEntry2)ExAllocatePoolWithTag(NonPagedPool, sizeof(RuleEntry2), 'RLE');
 	RtlZeroMemory(pRuleEntry2, sizeof(RuleEntry2));
 	pRuleEntry2->pRuleEntry = entry;
 	pRuleEntry2->underDBPath = underDBPath;
@@ -251,6 +254,7 @@ VOID ArvFreeRuleEntry2(PLIST_ENTRY pHead)
 		pRuleEntry2->pRuleEntry = NULL;
 		pRuleEntry2->underDBPath = FALSE;
 		ExFreePoolWithTag(pRuleEntry2, 'POC');
+		pRuleEntry2 = NULL;
 	}
 }
 
@@ -299,9 +303,9 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UIN
 		pListEntry = pListEntry->Flink;
 	}
 
-	PRegProcEntry pRegProcEntry = (PRegProcEntry)ExAllocatePoolWithTag(PagedPool, sizeof(RegProcEntry), 'RLE');
+	PRegProcEntry pRegProcEntry = (PRegProcEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(RegProcEntry), 'RLE');
 	RtlZeroMemory(pRegProcEntry, sizeof(RegProcEntry));
-	PSTR regProcName = (PSTR)ExAllocatePoolWithTag(PagedPool, strlen(procName)+1, 'RLE');
+	PSTR regProcName = (PSTR)ExAllocatePoolWithTag(NonPagedPool, strlen(procName)+1, 'RLE');
 	RtlCopyMemory(regProcName, procName, strlen(procName)+1);
 	pRegProcEntry->ProcName = regProcName;
 	pRegProcEntry->RuleID = ruleID;
@@ -324,6 +328,7 @@ BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName)
 			pRegProcEntry->RuleID = 0;
 			pRegProcEntry->Inherit = FALSE;
 			ExFreePoolWithTag(pRegProcEntry, 'FME');
+			pRegProcEntry = NULL;
 			return TRUE;
 		}
 		pListEntry = pListEntry->Flink;
@@ -341,6 +346,7 @@ VOID ArvFreeRegProcs(PFilterConfig pFilterConfig)
 		pRegProcEntry->ProcName = NULL;
 		pRegProcEntry->RuleID = 0;
 		ExFreePoolWithTag(pRegProcEntry, 'POC');
+		pRegProcEntry = NULL;
 	}
 }
 
@@ -356,6 +362,7 @@ VOID ArvProcessFlagRelease(PProcessFlags pFlags)
 	HASH_ITER(hh, pFlags->Flags, currentFlag, tmp) {
 		HASH_DEL(pFlags->Flags, currentFlag);
 		ExFreePoolWithTag(currentFlag, 'pcfg');
+		currentFlag = NULL;
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(&pFlags->Res);
 	ExDeleteResourceLite(&pFlags->Res);
@@ -364,7 +371,7 @@ VOID ArvProcessFlagRelease(PProcessFlags pFlags)
 VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID)
 {
 	ExEnterCriticalRegionAndAcquireResourceExclusive(&pFlags->Res);
-	PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(PagedPool, sizeof(ProcessFlag), 'pcfg');
+	PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcessFlag), 'pcfg');
 	pflag->Pid = pid;
 	pflag->Inherit = inherit;
 	pflag->RuleID = ruleID;
@@ -380,7 +387,7 @@ PProcessFlag ArvProcessFlagFind(PProcessFlags pFlags, UINT pid)
 	HASH_FIND_INT(pFlags->Flags, &pid, tmp);
 	if (tmp)
 	{
-		pFlag = ExAllocatePoolWithTag(PagedPool, sizeof(ProcessFlag), 'pcft');
+		pFlag = ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcessFlag), 'pcft');
 		pFlag->Pid = tmp->Pid;
 		pFlag->Inherit = tmp->Inherit;
 		pFlag->RuleID = tmp->RuleID;
@@ -398,6 +405,7 @@ VOID ArvProcessFlagDelete(PProcessFlags pFlags, UINT pid)
 	{
 		HASH_DEL(pFlags->Flags, pflag);
 		ExFreePoolWithTag(pflag, 'pcfg');
+		pflag = NULL;
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(&pFlags->Res);
 }
@@ -447,4 +455,29 @@ ULONG ArvGetUnixTimestamp()
 	{
 		return 0;
 	}
+}
+
+PPathEntry ArvFindPathByPrefix(PFilterConfig pFilterConfig, PUNICODE_STRING path)
+{
+	PLIST_ENTRY pListEntry = pFilterConfig->Rules.Flink;
+	PRuleEntry pRuleEntry = NULL;
+	PLIST_ENTRY pListEntry2 = NULL;
+	PPathEntry ppe = NULL;
+	while (pListEntry != &pFilterConfig->Rules)
+	{
+		pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+		pListEntry2 = pRuleEntry->Dirs.Flink;
+		while (pListEntry2 != &pRuleEntry->Dirs)
+		{
+			ppe = CONTAINING_RECORD(pListEntry2, PathEntry, entry);
+			UNICODE_STRING ppes = ppe->Path;
+			if (RtlPrefixUnicodeString(&ppe->Path, path, TRUE))
+			{
+				return ppe;
+			}
+			pListEntry2 = pListEntry2->Flink;
+		}
+		pListEntry = pListEntry->Flink;
+	}
+	return NULL;
 }
