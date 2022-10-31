@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <tchar.h>
 #include <fltUser.h>
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
@@ -103,3 +104,4 @@ VOID FreeRuleList(POpRule *pzpRules, int ruleSize);
 void GetDiskInfo(PArvDiskInfo diskInfo);
 bool VerifyPublicKey(PSTR pubkey58);
 int CopyByBlock(const TCHAR *dest_file_name, const TCHAR *src_file_name);
+bool InitRegistry();

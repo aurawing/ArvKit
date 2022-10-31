@@ -3,6 +3,7 @@
 #include <fltKernel.h>
 
 #include "config.h"
+#include "Rules.h"
 
 #define MIN_SECTOR_SIZE 0x200
 
@@ -33,3 +34,5 @@ extern BOOL AllowUnload;
 
 extern PFLT_PORT     gServerPort;//服务端口
 extern PFLT_PORT     gClientPort;//客户端口
+
+extern PathFilterRules SystemFilterRules;

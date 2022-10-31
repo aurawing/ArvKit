@@ -72,6 +72,9 @@
     <ClCompile Include="Dpc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Rules.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ArvFilter.rc">

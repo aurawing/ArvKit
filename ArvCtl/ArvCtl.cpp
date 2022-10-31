@@ -55,6 +55,7 @@ int WriteToLog(char*);
 //
 int __cdecl _tmain(int argc, TCHAR *argv[])
 {
+	//InitRegistry();
 	//Sleep(20000);
 	// If command-line parameter is "install", install the service. 
 	// Otherwise, the service is probably being started by the SCM.
@@ -183,6 +184,13 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	if (logfile == NULL)
 	{
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
+	if (!InitRegistry())
+	{
+		WriteToLog((char*)"in InitConfig(), init registry faled!");
+		fclose(logfile);
+		SvcReportEvent((LPTSTR)TEXT("RegisterServiceCtrlHandler"));
 		return;
 	}
 	if (InitConfig())

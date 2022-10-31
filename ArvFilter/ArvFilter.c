@@ -35,6 +35,7 @@ ULONG controlProcID = 0;
 PFLT_FILTER g_minifilterHandle = NULL;
 PDEVICE_OBJECT gDeviceObject = NULL;
 BOOL AllowUnload = TRUE;
+PathFilterRules SystemFilterRules = { 0 };
 
 // 获取全部父进程ID
 VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
@@ -89,7 +90,16 @@ BOOLEAN MatchReadWriteProcess(char *pStrProcessName)
 		_stricmp(pStrProcessName, "RuntimeBroker.") == 0 ||
 		//_stricmp(pStrProcessName, "DllHost.exe") == 0 ||
 		_stricmp(pStrProcessName, "SystemSettings") == 0 ||
-		_stricmp(pStrProcessName, "WmiPrvSE.exe") == 0;// strcmp(pStrProcessName, "smartscreen.exe") == 0 || strcmp(pStrProcessName, "smartscreen.ex") == 0;
+		_stricmp(pStrProcessName, "WmiPrvSE.exe") == 0 ||
+		_stricmp(pStrProcessName, "mmc.exe") == 0 ||
+		_stricmp(pStrProcessName, "taskhostw.exe") == 0 ||
+		_stricmp(pStrProcessName, "w3wp.exe") == 0 || 
+		//_stricmp(pStrProcessName, "InstallAgent.e") == 0 || 
+		_stricmp(pStrProcessName, "rdpclip.exe") == 0 || 
+		_stricmp(pStrProcessName, "fltMC.exe") == 0 ||
+		_stricmp(pStrProcessName, "cleanmgr.exe") == 0 ||
+		_stricmp(pStrProcessName, "MusNotificatio") == 0 ||
+		_stricmp(pStrProcessName, "Dllhost.exe") == 0;// strcmp(pStrProcessName, "smartscreen.exe") == 0 || strcmp(pStrProcessName, "smartscreen.ex") == 0;
 	return ret;
 }
 
@@ -345,7 +355,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	PEPROCESS pCallerProcess = NULL;
 	char *callerProcessName = "";
 
-	WCHAR SystemRoot[] = { 'C', ':', '\\' };
+	//WCHAR SystemRoot[] = { 'C', ':', '\\' };
 	WCHAR LoginPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'i', 'n', '?', '\\' };
 	WCHAR LogoutPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'L', 'o', 'g', 'o', 't', '?', '\\' };
 	WCHAR ReginPath[] = { '\\','?','S','u','r','s', 'e', 'n', 'R', 'e', 'g', 'i', 'n', '?', '\\' };
@@ -732,7 +742,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	{
 		KeBugCheck(NO_EXCEPTION_HANDLING_SUPPORT);
 	}*/
-	UNICODE_STRING ExpAllow1 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows");
+	/*UNICODE_STRING ExpAllow1 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows");
 	UNICODE_STRING ExpAllow2 = RTL_CONSTANT_STRING(L"\\AppData\\Roaming\\Microsoft\\Windows");
 	UNICODE_STRING ExpAllow3 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\Temp");
 	UNICODE_STRING ExpAllow4 = RTL_CONSTANT_STRING(L"\\AppData\\Local\\ConnectedDevicesPlatform");
@@ -772,8 +782,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	UNICODE_STRING ExpAllow22 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Packages");
 	UNICODE_STRING ExpAllow23 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCacheLock.dat");
 	UNICODE_STRING ExpAllow24 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
-	UNICODE_STRING ExpAllow25 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\INetCache");
+	UNICODE_STRING ExpAllow25 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\INetCache");*/
 
+	ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+	UINT ForD = 0;
+	UINT RorW = 0;
 	PProcessFlag pFlag = { 0 };
 	LIST_ENTRY procHead = { 0 };
 	InitializeListHead(&procHead);
@@ -849,6 +862,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			}
 		}
 
+
+		/*UNICODE_STRING tests = { 0 };
+		RtlInitUnicodeString(&tests, L"C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Windows\\Themes");
+		if (strcmp(callerProcessName, "explorer.exe") && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
+		{
+			DbgPrint("hit");
+		}*/
+
 		PRuleEntry pRuleEntry = { 0 };
 		PPathEntry pPathEntry = { 0 };
 		PLIST_ENTRY pListEntry1 = procHead.Flink;
@@ -918,7 +939,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		else
 		{
 			//ArvWriteLog(L"create", &fullPath, procID, callerProcessName, TRUE);
-			ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+			//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 			{
 				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
@@ -943,71 +964,124 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			else
 			{
 				PPathEntry pathEntry2 = NULL;
-				/*if (Data && Data->Iopb && (Data->Iopb->MajorFunction == IRP_MJ_CREATE))
-				{*/
-				//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-				if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
+				//UINT ForD = FALSE;
+				FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &ForD);
+				ForD++;
+
+				RorW = FILE_OPEN != createDisposition;
+				RorW++;
+
+				if (ArvSysPathFilterRulesIfMatch(&SystemFilterRules, procID, callerProcessName, ForD, RorW, &fullPath))
 				{
-					//if (ProcAllowed(procID) || (MatchReadonlyProcess(procID) && FILE_OPEN == createDisposition))
-					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
-					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-					}
-					else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || ArvFindSubString(&fullPath, &ExpAllow5) || RtlPrefixUnicodeString(&ExpAllow6, &fullPath, TRUE) == TRUE ) || RtlEqualUnicodeString(&fullPath, &ExpAllow7, TRUE) || ArvIfMatchUnicodeString(ExpAllows, &fullPath, sizeof(ExpAllows)/sizeof(ExpAllows[0])))
-					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					}
-					else if (RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow22, &fullPath, TRUE) ||  RtlEqualUnicodeString(&fullPath, &ExpAllow23, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow24, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow25, TRUE))
-					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					}
-					else
-					{
-						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
-						if (pathEntry2)
-						{
-							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
-							if (pathEntry2->isDB)
-							{
-								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
-							}
-						}
-						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-						Data->IoStatus.Information = 0;
-						status = FLT_PREOP_COMPLETE;
-					}
+					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+				}
+				else if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, ArvGetSystemRoot()->Buffer, 3 * sizeof(wchar_t)) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+				{
+					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 				}
 				else
 				{
-					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (MatchReadonlyProcess(callerProcessName) && FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+					DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+					if (pathEntry2)
 					{
-						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-					}
-					else
-					{
-						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
-						if (pathEntry2)
+						InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+						if (pathEntry2->isDB)
 						{
-							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
-							if (pathEntry2->isDB)
-							{
-								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
-							}
+							InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
 						}
-						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-						Data->IoStatus.Information = 0;
-						status = FLT_PREOP_COMPLETE;
 					}
+					Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+					Data->IoStatus.Information = 0;
+					status = FLT_PREOP_COMPLETE;
 				}
+
+//				/*if (Data && Data->Iopb && (Data->Iopb->MajorFunction == IRP_MJ_CREATE))
+//				{*/
+//				//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+//				if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
+//				{
+//					//if (ProcAllowed(procID) || (MatchReadonlyProcess(procID) && FILE_OPEN == createDisposition))
+//					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+//					{
+//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+////InterlockedIncrement64(&pPathEntry->stat.passCounter);
+//					}
+//					else if (ProcAllowedPaths(procID, callerProcessName, &fullPath))
+//					{
+//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//					}
+//					/*else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || ArvFindSubString(&fullPath, &ExpAllow5) || RtlPrefixUnicodeString(&ExpAllow6, &fullPath, TRUE) == TRUE ) || RtlEqualUnicodeString(&fullPath, &ExpAllow7, TRUE) || ArvIfMatchUnicodeString(ExpAllows, &fullPath, sizeof(ExpAllows)/sizeof(ExpAllows[0])))
+//					{
+//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//					}
+//					else if (RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow22, &fullPath, TRUE) ||  RtlEqualUnicodeString(&fullPath, &ExpAllow23, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow24, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow25, TRUE))
+//					{
+//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//					}*/
+//					else
+//					{
+//						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+//						if (pathEntry2)
+//						{
+//							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+//							if (pathEntry2->isDB)
+//							{
+//								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+//							}
+//						}
+//						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+//						Data->IoStatus.Information = 0;
+//						status = FLT_PREOP_COMPLETE;
+//					}
+//				}
+//				else
+//				{
+//					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (MatchReadonlyProcess(callerProcessName) && FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+//					{
+//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+//					}
+//					else
+//					{
+//						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+//						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+//						if (pathEntry2)
+//						{
+//							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+//							if (pathEntry2->isDB)
+//							{
+//								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+//							}
+//						}
+//						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+//						Data->IoStatus.Information = 0;
+//						status = FLT_PREOP_COMPLETE;
+//					}
+//				}
 			}
 		}
 	}
 	finally
 	{
+		if (status != FLT_PREOP_COMPLETE)
+		{
+			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+			//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
+			//cbdContext->UnderDBPath = underDBPath;
+			*CompletionContext = cbdContext;
+		}
+		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
+		{
+			ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD-1, FALSE);
+			//status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		}
+		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
+		{
+			ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD - 1, TRUE);
+		}
+
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		//ArvFreeRuleEntry2(&ruleEntry2Head);
 		if (dosName.Buffer)
@@ -1053,13 +1127,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//}
 		//else
 		//{
-		if (status != FLT_PREOP_COMPLETE)
-		{
-			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-			//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
-			//cbdContext->UnderDBPath = underDBPath;
-			*CompletionContext = cbdContext;
-		}
+		
 		//}
 
 	}
@@ -1075,7 +1143,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		status = FLT_PREOP_DISALLOW_FASTIO;
 	}
 
-	//if (status == FLT_PREOP_COMPLETE)
+	//if (status == FLT_PREOP_COMPLETE && fullPath.Length)
 	//{
 	//	/*UNICODE_STRING AdminPath = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator");
 	//	UNICODE_STRING AdminCachePath = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
@@ -1083,12 +1151,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	//	{
 	//		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	//	}*/
-	//	ArvWriteLog(L"create", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, FALSE);
+	//	ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, FALSE);
 	//	//TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Path: %wZ, Proc: %s, result: %d", &Data->Iopb->TargetFileObject->FileName, callerProcessName, 0);
 	//}
-	//else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	//else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
 	//{
-	//	ArvWriteLog(L"create", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, TRUE);
+	//	ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, TRUE);
 	//	//TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "Path: %wZ, Proc: %s, result: %d", &Data->Iopb->TargetFileObject->FileName, callerProcessName, 1);
 	//}
 	/*BOOL isFile = FALSE;
@@ -1375,12 +1443,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	LIST_ENTRY procHead = { 0 };
 	InitializeListHead(&procHead);
 	FindAncestorProcessID(procID, &procHead);
+	UINT ForD = 0;
 
-
-	UNICODE_STRING ExpAllow10 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
+	/*UNICODE_STRING ExpAllow10 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
 
 	UNICODE_STRING ExpAllow20 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCache");
-	UNICODE_STRING ExpAllow21 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Explorer");
+	UNICODE_STRING ExpAllow21 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Explorer");*/
 
 	try
 	{
@@ -1536,18 +1604,34 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			//{
 			//	if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
 			//	{
-					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName))
-					{
-						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-					}
-					else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (RtlPrefixUnicodeString(&ExpAllow10, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE)))
+					//if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName))
+					//{
+					//	DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					//	//InterlockedIncrement64(&pPathEntry->stat.passCounter);
+					//}
+					//else if (ProcAllowedPaths(procID, callerProcessName, &fullPath))
+					//{
+					//	DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					//}
+					/*else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (RtlPrefixUnicodeString(&ExpAllow10, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE)))
 					{
 						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					}
 					else if (RtlPrefixUnicodeString(&ExpAllow20, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE))
 					{
 						DbgPrint("[FsFilter:setinfo]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					}*/
+
+					PPathEntry pathEntry2 = NULL;
+					//UINT ForD = FALSE;
+					FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &ForD);
+					ForD++;
+
+					UINT RorW = 2;
+
+					if (ArvSysPathFilterRulesIfMatch(&SystemFilterRules, procID, callerProcessName, ForD, RorW, &fullPath))
+					{
+						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					}
 					else
 					{
@@ -1556,7 +1640,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 						//Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 						//Data->IoStatus.Information = 0;
 						//status = FLT_PREOP_COMPLETE;
-
+						BOOLEAN blocked = FALSE;
 						switch (Data->Iopb->Parameters.SetFileInformation.FileInformationClass) {
 						case FileDispositionInformation:
 						case 64:
@@ -1567,6 +1651,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 								Data->IoStatus.Information = 0;
 								status = FLT_PREOP_COMPLETE;
 							}
+							blocked = TRUE;
 							break;
 						case FileRenameInformation:
 						case 65:
@@ -1575,7 +1660,20 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 							Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 							Data->IoStatus.Information = 0;
 							status = FLT_PREOP_COMPLETE;
+							blocked = TRUE;
 							break;
+						}
+						if (blocked)
+						{
+							PPathEntry pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+							if (pathEntry2)
+							{
+								InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+								if (pathEntry2->isDB)
+								{
+									InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+								}
+							}
 						}
 					}
 				//}
@@ -1614,6 +1712,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	}
 	finally
 	{
+		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
+		{
+			ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, FALSE);
+		}
+		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
+		{
+			ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, TRUE);
+		}
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		//ArvFreeRuleEntry2(&ruleEntry2Head);
 		if (dosName.Buffer)
@@ -1653,13 +1759,13 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		ExFreePoolWithTag(cbdContext, 'POC');
 		cbdContext = NULL;
 	}
-	/*if (status == FLT_PREOP_COMPLETE)
+	/*if (status == FLT_PREOP_COMPLETE && fullPath.Length)
 	{
-		ArvWriteLog(L"setinfo", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, FALSE);
+		ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, FALSE);
 	}
-	else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && fullPath.Length)
 	{
-		ArvWriteLog(L"setinfo", &Data->Iopb->TargetFileObject->FileName, procID, callerProcessName, TRUE);
+		ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, TRUE);
 	}*/
 	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
 	{
@@ -2188,6 +2294,7 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 	if (NULL != gServerPort) {
 		FltCloseCommunicationPort(gServerPort);
 	}
+	ArvCleanLog();
 	if (NULL != g_minifilterHandle) {
 		FltUnregisterFilter(g_minifilterHandle);
 	}
@@ -2210,7 +2317,10 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 	}
 	ArvProcessFlagRelease(&processFlags);
 	//WPP_CLEANUP(pDriverObject);
-	ArvCleanLog();
+	//CleanFilterPaths();
+	ArvSysPathFilterRulesRelease(&SystemFilterRules);
+	CleanFilterConfig();
+	ArvDeleteLogResource();
 	return STATUS_SUCCESS;
 }
 
@@ -2418,15 +2528,15 @@ VOID ArvInstanceSetupWhenSafe(
 			FltReleaseContext(ctx);
 		}
 
-	//
-	//  Remove the reference added to the device object by
-	//  FltGetDiskDeviceObject.
-	//
+		//
+		//  Remove the reference added to the device object by
+		//  FltGetDiskDeviceObject.
+		//
 
-	if (devObj) {
+		if (devObj) {
 
-		ObDereferenceObject(devObj);
-	}
+			ObDereferenceObject(devObj);
+		}
 	}
 
 	return;
@@ -2623,6 +2733,26 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 		//开启进程过滤
 		PsSetCreateProcessNotifyRoutine(CreateProcessNotify, FALSE);
 
+		/*status = InitFilterPaths();
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint("[FsFilter:register]read by-pass paths from registry failed: %d\n", status);
+			__leave;
+		}*/
+		status = ArvSysPathFilterRulesInit(&SystemFilterRules);
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint("[FsFilter:register]read by-pass paths from registry failed: %d\n", status);
+			__leave;
+		}
+		InitFilterConfig();
+
+		////Test
+		//UNICODE_STRING FullPath = { 0 };
+		//RtlInitUnicodeString(&FullPath, L"C:\\Users\\Public\\123.txt");
+		//BOOLEAN bTest = ArvSysPathFilterRulesIfMatch(&SystemFilterRules, 4, "explorer.exe", 1, 2, &FullPath);
+		////Test
+
 		//
 		// start minifilter driver
 		//
@@ -2669,6 +2799,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 			ArvProcessFlagRelease(&processFlags);
 		}
 	}
+
 
 
 	/*PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcessFlag), 'pcfg');

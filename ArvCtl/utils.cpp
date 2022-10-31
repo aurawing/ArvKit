@@ -278,3 +278,95 @@ int CopyByBlock(const TCHAR *dest_file_name, const TCHAR *src_file_name)
 	fclose(fp2);
 	return cnt;
 }
+
+bool InitRegistry()
+{
+	LSTATUS lrtn = 0;
+	TCHAR profileDirectoryPath[512];
+	DWORD profileDirectoryPathSize = 512;
+	TCHAR programDataPath[512];
+	DWORD programDataPathSize = 512;
+	TCHAR publicPath[512];
+	DWORD publicPathSize = 512;
+	TCHAR windowsPath[512];
+	DWORD windowsPathSize = 512;
+	DWORD dwType = REG_SZ;
+
+	HKEY hKeyWin = NULL;
+	TCHAR *lpszSubKeyWin = (TCHAR*)_T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKeyWin, 0, KEY_READ, &hKeyWin) != ERROR_SUCCESS)
+	{
+		return false;
+	}
+	lrtn = RegQueryValueEx(hKeyWin, _T("PathName"), NULL, &dwType, (LPBYTE)windowsPath, &windowsPathSize);
+	if (lrtn != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyWin);
+		return false;
+	}
+	RegCloseKey(hKeyWin);
+
+	HKEY hKeyR = NULL;
+	TCHAR *lpszSubKeyR = (TCHAR*)_T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList");
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKeyR, 0, KEY_READ, &hKeyR) != ERROR_SUCCESS)
+	{
+		return false;
+	}
+	lrtn = RegQueryValueEx(hKeyR, _T("ProfilesDirectory"), NULL, &dwType, (LPBYTE)profileDirectoryPath, &profileDirectoryPathSize);
+	if (lrtn != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyR);
+		return false;
+	}
+	lrtn = RegQueryValueEx(hKeyR, _T("ProgramData"), NULL, &dwType, (LPBYTE)programDataPath, &programDataPathSize);
+	if (lrtn != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyR);
+		return false;
+	}
+	lrtn = RegQueryValueEx(hKeyR, _T("Public"), NULL, &dwType, (LPBYTE)publicPath, &publicPathSize);
+	if (lrtn != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyR);
+		return false;
+	}
+	RegCloseKey(hKeyR);
+	lrtn = ExpandEnvironmentStrings(profileDirectoryPath, profileDirectoryPath, 512);
+	lrtn = ExpandEnvironmentStrings(programDataPath, programDataPath, 512);
+	lrtn = ExpandEnvironmentStrings(publicPath, publicPath, 512);
+
+	HKEY hKeyW = NULL;
+	TCHAR *lpszSubKeyW = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKeyW, 0, KEY_ALL_ACCESS, &hKeyW) != ERROR_SUCCESS)
+	{
+		return false;
+	}
+
+	RegDeleteValue(hKeyW, _T("ArvProfilesDirectory"));
+	if (RegSetValueEx(hKeyW, _T("ArvProfilesDirectory"), 0, REG_SZ, (const BYTE*)profileDirectoryPath, wcslen(profileDirectoryPath)*sizeof(TCHAR)) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyW);
+		return false;
+	}
+	RegDeleteValue(hKeyW, _T("ArvProgramData"));
+	if (RegSetValueEx(hKeyW, _T("ArvProgramData"), 0, REG_SZ, (const BYTE*)programDataPath, wcslen(programDataPath) * sizeof(TCHAR)) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyW);
+		return false;
+	}
+	RegDeleteValue(hKeyW, _T("ArvPublic"));
+	if (RegSetValueEx(hKeyW, _T("ArvPublic"), 0, REG_SZ, (const BYTE*)publicPath, wcslen(publicPath) * sizeof(TCHAR)) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyW);
+		return false;
+	}
+	RegDeleteValue(hKeyW, _T("ArvWinRoot"));
+	if (RegSetValueEx(hKeyW, _T("ArvWinRoot"), 0, REG_SZ, (const BYTE*)windowsPath, wcslen(windowsPath) * sizeof(TCHAR)) != ERROR_SUCCESS)
+	{
+		RegCloseKey(hKeyW);
+		return false;
+	}
+	RegCloseKey(hKeyW);
+
+	return true;
+}

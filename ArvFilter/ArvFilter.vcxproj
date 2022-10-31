@@ -49,6 +49,7 @@
     <ClCompile Include="libsecp256k1\src\precomputed_ecmult_gen.c" />
     <ClCompile Include="libsecp256k1\src\secp256k1.c" />
     <ClCompile Include="libsha256\sha256.c" />
+    <ClCompile Include="Rules.c" />
     <ClCompile Include="Utils.c" />
     <ResourceCompile Include="ArvFilter.rc" />
     <ClCompile Include="ArvFilter.c" />
@@ -170,7 +171,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>fltMgr.lib;Cng.lib;wpprecorder.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>fltMgr.lib;Cng.lib;Ksecdd.lib;wpprecorder.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
@@ -186,7 +187,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
-      <AdditionalDependencies>fltMgr.lib;Cng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>fltMgr.lib;Cng.lib;Ksecdd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
@@ -228,6 +229,7 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="init.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Rules.h" />
     <ClInclude Include="Trace.h" />
     <ClInclude Include="uthash.h" />
     <ClInclude Include="utils.h" />

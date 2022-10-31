@@ -235,6 +235,9 @@ Cleanup:
 		ExFreePoolWithTag(processUser, 'TOK');
 		processUser = NULL;
 	}
+	if (handle) {
+		ZwClose(handle);
+	}
 	if (sid.Buffer)
 	{
 		RtlFreeUnicodeString(&sid);
@@ -433,92 +436,519 @@ XBFltGetVolumeInstance(
 	return pInstance;
 }
 
+//UNICODE_STRING ProfilesDirectoryPath = { 0 };
+//UNICODE_STRING ProgramDataPath = { 0 };
+//UNICODE_STRING PublicPath = { 0 };
+UNICODE_STRING SystemRoot = { 0 };
+DWORD LogFlag = 0;
+DWORD LogAutoClose = 0;
+
+
+NTSTATUS CleanFilterConfig()
+{
+	if (SystemRoot.Buffer)
+	{
+		RtlFreeUnicodeString(&SystemRoot);
+	}
+}
+
+NTSTATUS InitFilterConfig()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	RTL_QUERY_REGISTRY_TABLE arrayTable0[2];
+	RtlZeroMemory(arrayTable0, sizeof(arrayTable0));
+	arrayTable0[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable0[0].Name = L"SystemRoot";
+	arrayTable0[0].EntryContext = &SystemRoot;
+	arrayTable0[0].DefaultType = REG_SZ;
+	arrayTable0[0].DefaultData = REG_NONE;
+	arrayTable0[0].DefaultLength = REG_NONE;
+	status = RtlQueryRegistryValues(RTL_REGISTRY_WINDOWS_NT, L"", arrayTable0, NULL, NULL);
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
+
+	RTL_QUERY_REGISTRY_TABLE arrayTable[5];
+
+	//RtlInitUnicodeString(&userPath, NULL);
+	RtlZeroMemory(arrayTable, sizeof(arrayTable));
+
+	arrayTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable[0].Name = L"LogFlag";
+	arrayTable[0].EntryContext = &LogFlag;
+	arrayTable[0].DefaultType = REG_DWORD;
+	arrayTable[0].DefaultData = REG_NONE;
+	arrayTable[0].DefaultLength = REG_NONE;
+	arrayTable[1].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable[1].Name = L"LogAutoClose";
+	arrayTable[1].EntryContext = &LogAutoClose;
+	arrayTable[1].DefaultType = REG_DWORD;
+	arrayTable[1].DefaultData = REG_NONE;
+	arrayTable[1].DefaultLength = REG_NONE;
+
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable, NULL, NULL);
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
+	if (LogAutoClose == 1)
+	{
+		status = RtlDeleteRegistryValue(RTL_REGISTRY_SERVICES, L"ArvCtl", L"LogFlag");
+	}
+	return status;
+}
+
+PUNICODE_STRING ArvGetSystemRoot()
+{
+	return &SystemRoot;
+}
+
+DWORD ArvGetLogFlag()
+{
+	return LogFlag;
+}
+
+//UNICODE_STRING ExpAllowedPartialPaths[25] = {
+//		RTL_CONSTANT_STRING(L""),
+//		RTL_CONSTANT_STRING(L""),
+//		RTL_CONSTANT_STRING(L"\\AppData"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\ConnectedDevicesPlatform*"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft*"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows*"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\Temp*"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Roaming"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Roaming\\Microsoft\\Windows*"),
+//		RTL_CONSTANT_STRING(L"\\Desktop"),
+//		RTL_CONSTANT_STRING(L""),
+//		RTL_CONSTANT_STRING(L"\\Desktop"),
+//		RTL_CONSTANT_STRING(L"\\rescache\\_merged*"),
+//		RTL_CONSTANT_STRING(L"\\system32\\catroot"),
+//		RTL_CONSTANT_STRING(L"\\system32\\catroot2"),
+//		RTL_CONSTANT_STRING(L""),
+//		RTL_CONSTANT_STRING(L"\\Microsoft\\Windows\\Start Menu"),
+//		RTL_CONSTANT_STRING(L"\\Microsoft\\Windows\\Start Menu\\Programs"),
+//		RTL_CONSTANT_STRING(L"\\Microsoft\\Windows\\Start Menu Places"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\IconCache.db"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\Explorer\\iconcache_idx.db"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Roaming\\Microsoft\\Internet Explorer\\Quick Launch"),
+//		RTL_CONSTANT_STRING(L"\\AppData\\Roaming\\Microsoft\\Internet Explorer\\Quick Launch\\User Pinned"),
+//		RTL_CONSTANT_STRING(L"\\Microsoft\\Windows\\Caches")
+//};
+//
+//UNICODE_STRING OthAllowedPartialPaths[8] = {
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\WebCache*"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\ConnectedDevicesPlatform*"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Packages*"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\WebCacheLock.dat"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\Caches"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\INetCache"),
+//	RTL_CONSTANT_STRING(L"\\AppData\\Local\\Microsoft\\Windows\\Explorer*"),
+//	RTL_CONSTANT_STRING(L"")
+//};
+
+
+//BOOLEAN ProcAllowedPaths(ULONG ProcID, PSTR ProcessName, PUNICODE_STRING FullPath)
+//{
+//	//BYTE PathBuffers[24][520] = ExAllocatePoolWithTag(NonPagedPool, 24*520, 'ftr1');
+//	BYTE (*PathBuffers)[520] = ExAllocatePoolWithTag(NonPagedPool, 25 * 520, 'ftr1');
+//	RtlZeroMemory(PathBuffers, 25*520);
+//	UNICODE_STRING ExpAllowedPaths[25] = { 0 };
+//
+//	//BYTE OthPathBuffers[6][520] = ExAllocatePoolWithTag(NonPagedPool, 6 * 520, 'ftr2');
+//	BYTE (*OthPathBuffers)[520] = ExAllocatePoolWithTag(NonPagedPool, 8 * 520, 'ftr2');
+//	RtlZeroMemory(OthPathBuffers, 8 * 520);
+//	UNICODE_STRING OthAllowedPaths[8] = { 0 };
+//	 
+//	NTSTATUS    status;
+//	HANDLE      processToken = NULL;
+//	TOKEN_USER *processUser = NULL;
+//	ULONG       processUserBytes = 0;
+//	UNICODE_STRING sid = { 0 };
+//	HANDLE handle;
+//	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+//	CLIENT_ID clientid = { 0 };
+//
+//	UNICODE_STRING owner = { 0 };
+//	BYTE ownerBuffer[256] = { 0 };
+//	//UNICODE_STRING domain;
+//	ULONG ownerSize = 1;// , domainSize = 1;
+//	SID_NAME_USE eUse = SidTypeUnknown;
+//	RtlInitEmptyUnicodeString(&owner, ownerBuffer, 256);
+//
+//	InitializeObjectAttributes(&ObjectAttributes, 0, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, 0, 0);
+//	clientid.UniqueProcess = (HANDLE)ProcID;
+//	clientid.UniqueThread = 0;
+//	status = ZwOpenProcess(&handle, PROCESS_ALL_ACCESS, &ObjectAttributes, &clientid);
+//	if (!NT_SUCCESS(status)) {
+//		DbgPrint("Cannot open token for process %u: %08X", ProcID, status);
+//		goto Cleanup;
+//	}
+//
+//	// Open process token
+//	status = ZwOpenProcessTokenEx(handle, GENERIC_READ,
+//		OBJ_KERNEL_HANDLE, &processToken);
+//	if (!NT_SUCCESS(status)) {
+//		DbgPrint("Cannot open token for process %u: %08X", ProcID, status);
+//		goto Cleanup;
+//	}
+//
+//	// Get size of buffer to hold the user information, which contains the SID
+//	status = ZwQueryInformationToken(processToken, TokenUser,
+//		NULL, 0, &processUserBytes);
+//	if (status != STATUS_BUFFER_TOO_SMALL) {
+//		DbgPrint("Cannot get token information size for process %u: %08X", ProcID, status);
+//		goto Cleanup;
+//	}
+//
+//	// Allocate the buffer to hold the user information
+//	processUser = (TOKEN_USER*)ExAllocatePoolWithTag(
+//		NonPagedPool, processUserBytes, 'TOK');
+//	if (processUser == NULL) {
+//		DbgPrint("Cannot allocate %u token information bytes for process %u", processUserBytes, ProcID);
+//		status = STATUS_INSUFFICIENT_RESOURCES;
+//		goto Cleanup;
+//	}
+//
+//	// Get user information for the process token
+//	status = ZwQueryInformationToken(processToken, TokenUser, processUser, processUserBytes, &processUserBytes);
+//	if (!NT_SUCCESS(status)) {
+//		DbgPrint("Cannot get token information for process %u: %08X", ProcID, status);
+//		goto Cleanup;
+//	}
+//
+//	status = SecLookupAccountSid(processUser->User.Sid, &ownerSize, &owner, NULL, NULL, &eUse);
+//	if (!NT_SUCCESS(status))
+//	{
+//		DbgPrint("Cannot convert SID to name for process %u: %08X", ProcID, status);
+//		goto Cleanup;
+//	}
+//
+//	for (UINT i = 0; i < sizeof(ExpAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//	{
+//		RtlInitEmptyUnicodeString(&ExpAllowedPaths[i], PathBuffers[i], 520);
+//	}
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[0], &ProfilesDirectoryPath);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[1], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[1], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[1], &owner);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[2], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[2], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[2], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[2], &ExpAllowedPartialPaths[2]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[3], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[3], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[3], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[3], &ExpAllowedPartialPaths[3]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[4], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[4], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[4], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[4], &ExpAllowedPartialPaths[4]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[5], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[5], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[5], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[5], &ExpAllowedPartialPaths[5]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[6], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[6], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[6], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[6], &ExpAllowedPartialPaths[6]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[7], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[7], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[7], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[7], &ExpAllowedPartialPaths[7]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[8], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[8], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[8], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[8], &ExpAllowedPartialPaths[8]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[9], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[9], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[9], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[9], &ExpAllowedPartialPaths[9]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[10], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[10], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[10], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[10], &ExpAllowedPartialPaths[10]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[11], &PublicPath);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[12], &PublicPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[12], &ExpAllowedPartialPaths[12]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[13], &WinRootPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[13], &ExpAllowedPartialPaths[13]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[14], &WinRootPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[14], &ExpAllowedPartialPaths[14]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[15], &WinRootPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[15], &ExpAllowedPartialPaths[15]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[16], &ProgramDataPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[16], &ExpAllowedPartialPaths[16]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[17], &ProgramDataPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[17], &ExpAllowedPartialPaths[17]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[18], &ProgramDataPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[18], &ExpAllowedPartialPaths[18]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[19], &ProgramDataPath); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[19], &ExpAllowedPartialPaths[19]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[20], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[20], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[20], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[20], &ExpAllowedPartialPaths[20]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[21], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[21], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[21], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[21], &ExpAllowedPartialPaths[21]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[22], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[22], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[22], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[22], &ExpAllowedPartialPaths[22]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[23], &ProfilesDirectoryPath); 
+//	RtlAppendUnicodeToString(&ExpAllowedPaths[23], L"\\");  
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[23], &owner); 
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[23], &ExpAllowedPartialPaths[23]);
+//
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[24], &ProgramDataPath);
+//	RtlAppendUnicodeStringToString(&ExpAllowedPaths[24], &ExpAllowedPartialPaths[24]);
+//
+//	for (UINT i = 0; i < sizeof(OthAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//	{
+//		RtlInitEmptyUnicodeString(&OthAllowedPaths[i], OthPathBuffers[i], 520);
+//		/*RtlAppendUnicodeStringToString(&OthAllowedPaths[i], &ProfilesDirectoryPath);
+//		RtlAppendUnicodeToString(&OthAllowedPaths[i], L"\\"); 
+//		RtlAppendUnicodeStringToString(&OthAllowedPaths[i], &owner);
+//		RtlAppendUnicodeStringToString(&OthAllowedPaths[i], &OthAllowedPartialPaths[i]);*/
+//	}
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[0], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[0], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[0], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[0], &OthAllowedPartialPaths[0]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[1], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[1], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[1], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[1], &OthAllowedPartialPaths[1]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[2], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[2], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[2], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[2], &OthAllowedPartialPaths[2]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[3], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[3], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[3], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[3], &OthAllowedPartialPaths[3]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[4], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[4], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[4], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[4], &OthAllowedPartialPaths[4]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[5], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[5], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[5], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[5], &OthAllowedPartialPaths[5]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[6], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[6], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[6], &owner);
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[6], &OthAllowedPartialPaths[6]);
+//
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[7], &ProfilesDirectoryPath);
+//	RtlAppendUnicodeToString(&OthAllowedPaths[7], L"\\");
+//	RtlAppendUnicodeStringToString(&OthAllowedPaths[7], &owner);
+//
+//
+//	for (UINT i = 0; i < sizeof(ExpAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//	{
+//		RtlUpcaseUnicodeString(&ExpAllowedPaths[i], &ExpAllowedPaths[i], FALSE);
+//	}
+//
+//	for (UINT i = 0; i < sizeof(OthAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//	{
+//		RtlUpcaseUnicodeString(&OthAllowedPaths[i], &OthAllowedPaths[i], FALSE);
+//	}
+//
+//	status = STATUS_ACCESS_DENIED;
+//	if (_stricmp(ProcessName, "explorer.exe") == 0)
+//	{
+//		for (UINT i = 0; i < sizeof(ExpAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//		{
+//			if (FsRtlIsNameInExpression(&ExpAllowedPaths[i], FullPath, TRUE, NULL))
+//			{
+//				status = STATUS_SUCCESS;
+//				goto Cleanup;
+//			}
+//		}
+//	}
+//	else
+//	{
+//		for (UINT i = 0; i < sizeof(OthAllowedPaths) / sizeof(UNICODE_STRING); i++)
+//		{
+//			if (FsRtlIsNameInExpression(&OthAllowedPaths[i], FullPath, TRUE, NULL))
+//			{
+//				status = STATUS_SUCCESS;
+//				goto Cleanup;
+//			}
+//		}
+//	}
+//Cleanup:
+//	if (processToken) {
+//		ZwClose(processToken);
+//	}
+//	if (processUser) {
+//		ExFreePoolWithTag(processUser, 'TOK');
+//		processUser = NULL;
+//	}
+//	if (handle) {
+//		ZwClose(handle);
+//	}
+//	if (sid.Buffer)
+//	{
+//		RtlFreeUnicodeString(&sid);
+//	}
+//	/*if (owner.Buffer)
+//	{
+//		RtlFreeUnicodeString(&owner);
+//	}*/
+//	if (PathBuffers)
+//	{
+//		ExFreePoolWithTag(PathBuffers, 'ftr1');
+//	}
+//	if (OthPathBuffers)
+//	{
+//		ExFreePoolWithTag(OthPathBuffers, 'ftr1');
+//	}
+//	if (NT_SUCCESS(status))
+//	{
+//		return TRUE;
+//	}
+//	else
+//	{
+//		return FALSE;
+//	}
+//}
+
 VOID ArvCleanLog()
 {
-	/*if (LogVolume)
-	{
-		FltObjectDereference(LogVolume);
-	}
-	if (LogInstance)
-	{
-		FltObjectDereference(LogInstance);
-	}
-	if (LogFileObject)
-	{
-		FltClose(LogFileHandle);
-		ObDereferenceObject(LogFileObject);
-	}*/
 	ExEnterCriticalRegionAndAcquireResourceExclusive(&LogResource);
 	bReady = FALSE;
 	ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+}
+
+VOID ArvDeleteLogResource()
+{
 	ExDeleteResourceLite(&LogResource);
 }
 
 NTSTATUS ArvInitLog(PFLT_FILTER pFilter)
 {
 	ExInitializeResourceLite(&LogResource);
-
-
-
-	////HANDLE SourceFileHandle = NULL;      //源文件句柄
-	////HANDLE TargetFileHandle = NULL;      //目标文件句柄
-	//NTSTATUS Status = STATUS_SUCCESS;    //返回状态
-	//OBJECT_ATTRIBUTES ObjectAttributes;  //OBJECT_ATTRIBUTES结构
-	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\C:\\filter.log"); //源文件
-	////UNICODE_STRING TargetFilePath = RTL_CONSTANT_STRING(L"\\??\\c:\\target.txt"); //目标文件
-	////UNICODE_STRING String = { 0 };           //指向Buffer
-	//IO_STATUS_BLOCK IoStatusBlock;         //返回结果状态结构体
-	////PVOID Buffer = NULL;                   //buffer指针
-	////USHORT Length = 0;                     //要读写的长度
-	////LARGE_INTEGER Offset = { 0 };            //要读写的偏移
-
-	//ExInitializeResourceLite(&LogResource);
-	////初始化OBJECT_ATTRIBUTES结构体
-	//InitializeObjectAttributes(
-	//	&ObjectAttributes,
-	//	&LogFilePath,
-	//	OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
-	//	NULL,
-	//	NULL);
-
-	////以FILE_OVERWRITE_IF方式打开
-	//Status = FltCreateFile(
-	//	pFilter,
-	//	NULL,
-	//	&LogFileHandle,
-	//	&LogFileObject,
-	//	GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE,
-	//	&ObjectAttributes,
-	//	&IoStatusBlock,
-	//	NULL,
-	//	FILE_ATTRIBUTE_NORMAL,
-	//	FILE_SHARE_READ,
-	//	FILE_OVERWRITE_IF,
-	//	FILE_NON_DIRECTORY_FILE | FILE_RANDOM_ACCESS | FILE_SYNCHRONOUS_IO_NONALERT,
-	//	NULL,
-	//	0,
-	//	0);
-	//if (!NT_SUCCESS(Status))
-	//{
-	//	DbgPrint("Open source file fault !! - %#x\n", Status);
-	//	return Status;
-	//}
-	//if (LogFileObject)
-	//{
-	//	Status = FltGetVolumeFromFileObject(pFilter, LogFileObject, &LogVolume);
-	//	if (NT_SUCCESS(Status))
-	//	{
-	//		Status = FltGetVolumeInstanceFromName(pFilter, LogVolume, NULL, &LogInstance);
-	//	}
-	//}
-	//if (!NT_SUCCESS(Status))
-	//{
-	//	ArvCleanLog();
-	//}
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR processName, BOOLEAN pass)
+NTSTATUS GetOwnerNameByProcID2(__in ULONG ProcID, __in UINT bufLen, __inout PWSTR name, __out PUINT len)
+{
+	NTSTATUS    status;
+	HANDLE      processToken = NULL;
+	TOKEN_USER *processUser = NULL;
+	ULONG       processUserBytes = 0;
+	UNICODE_STRING sid = { 0 };
+	HANDLE handle;
+	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+	CLIENT_ID clientid = { 0 };
+
+	UNICODE_STRING owner = { 0 };
+	//BYTE ownerBuffer[256] = { 0 };
+	//ULONG ownerSize = 1;
+	SID_NAME_USE eUse = SidTypeUnknown;
+	RtlInitEmptyUnicodeString(&owner, name, bufLen);
+	InitializeObjectAttributes(&ObjectAttributes, 0, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, 0, 0);
+	clientid.UniqueProcess = (HANDLE)ProcID;
+	clientid.UniqueThread = 0;
+	status = ZwOpenProcess(&handle, PROCESS_ALL_ACCESS, &ObjectAttributes, &clientid);
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("Cannot open token for process %u: %08X", ProcID, status);
+		goto Cleanup;
+	}
+
+	// Open process token
+	status = ZwOpenProcessTokenEx(handle, GENERIC_READ,
+		OBJ_KERNEL_HANDLE, &processToken);
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("Cannot open token for process %u: %08X", ProcID, status);
+		goto Cleanup;
+	}
+
+	// Get size of buffer to hold the user information, which contains the SID
+	status = ZwQueryInformationToken(processToken, TokenUser,
+		NULL, 0, &processUserBytes);
+	if (status != STATUS_BUFFER_TOO_SMALL) {
+		DbgPrint("Cannot get token information size for process %u: %08X", ProcID, status);
+		goto Cleanup;
+	}
+
+	// Allocate the buffer to hold the user information
+	processUser = (TOKEN_USER*)ExAllocatePoolWithTag(
+		NonPagedPool, processUserBytes, 'TOK');
+	if (processUser == NULL) {
+		DbgPrint("Cannot allocate %u token information bytes for process %u", processUserBytes, ProcID);
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto Cleanup;
+	}
+
+	// Get user information for the process token
+	status = ZwQueryInformationToken(processToken, TokenUser, processUser, processUserBytes, &processUserBytes);
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("Cannot get token information for process %u: %08X", ProcID, status);
+		goto Cleanup;
+	}
+
+	status = SecLookupAccountSid(processUser->User.Sid, len, &owner, NULL, NULL, &eUse);
+	if (!NT_SUCCESS(status))
+	{
+		DbgPrint("Cannot convert SID to name for process %u: %08X", ProcID, status);
+		goto Cleanup;
+	}
+Cleanup:
+	if (processToken) {
+		ZwClose(processToken);
+	}
+	if (processUser) {
+		ExFreePoolWithTag(processUser, 'TOK');
+		processUser = NULL;
+	}
+	if (handle) {
+		ZwClose(handle);
+	}
+	if (sid.Buffer)
+	{
+		RtlFreeUnicodeString(&sid);
+	}
+	return status;
+}
+
+NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR processName, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass)
 {
 	HANDLE LogFileHandle = { 0 };
 	PFILE_OBJECT LogFileObject = { 0 };
@@ -621,6 +1051,34 @@ NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR proces
 	RtlInitEmptyUnicodeString(&uniProcess, buf, 128);
 	RtlAnsiStringToUnicodeString(&uniProcess, &AnsiString, FALSE);
 	RtlAppendUnicodeStringToString(&String, &uniProcess);
+
+	WCHAR ownerName[128];
+	UINT ownerNameLen = 0;
+	Status = GetOwnerNameByProcID2(procID, 128, ownerName, &ownerNameLen);
+	UNICODE_STRING uOwnerName = { 0 };
+	RtlInitUnicodeString(&uOwnerName, ownerName);
+	uOwnerName.Length = uOwnerName.MaximumLength = ownerNameLen;
+	RtlAppendUnicodeToString(&String, L" - ");
+	RtlAppendUnicodeStringToString(&String, &uOwnerName);
+
+	if (read)
+	{
+		RtlAppendUnicodeToString(&String, L" - read");
+	}
+	else
+	{
+		RtlAppendUnicodeToString(&String, L" - write");
+	}
+
+	if (isFolder)
+	{
+		RtlAppendUnicodeToString(&String, L" - folder");
+	}
+	else
+	{
+		RtlAppendUnicodeToString(&String, L" - file");
+	}
+
 	if (pass)
 	{
 		RtlAppendUnicodeToString(&String, L" - yes\n");
@@ -629,7 +1087,10 @@ NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR proces
 	{
 		RtlAppendUnicodeToString(&String, L" - no\n");
 	}
-
+	if (!LogFileInstance)
+	{
+		goto CLEAN;
+	}
 	FILE_STANDARD_INFORMATION fileInfo = { 0 };
 	Status = FltQueryInformationFile(LogFileInstance, LogFileObject, &fileInfo, sizeof(fileInfo), FileStandardInformation, NULL);
 	if (!NT_SUCCESS(Status))

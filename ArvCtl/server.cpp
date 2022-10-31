@@ -135,6 +135,11 @@ void process(WFHttpTask *server_task)
 							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
 							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+							if (pJsonPath == NULL || pJsonIsDB == NULL)
+							{
+								flag = false;
+								break;
+							}
 							if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
 							{
 								flag = false;
@@ -376,9 +381,12 @@ void process(WFHttpTask *server_task)
 						user_resp->set_status_code("500");
 						user_resp->append_output_body("{\"code\": -62, \"msg\": \"save registry of system config failed\", \"data\": {}}");
 					}
-					RegCloseKey(hKey);
-					user_resp->set_status_code("200");
-					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					else
+					{
+						RegCloseKey(hKey);
+						user_resp->set_status_code("200");
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					}
 				}
 				else {
 					user_resp->set_status_code("500");
