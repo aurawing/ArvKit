@@ -151,6 +151,7 @@ MiniMessage(
 		OpSetAllowUnload *pOpSetAllowUnload = NULL;
 		OpSetControlProc *pOpSetControlProc = NULL;
 		OpSetRegProcs *pOpSetRegProcs = NULL;
+		OpSetFilterStatus *pOpSetFilterStatus = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -316,6 +317,16 @@ MiniMessage(
 				controlProcID = pOpSetControlProc->controlProcID;
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]set procID %d\n", pOpSetControlProc->controlProcID);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_FILTER_STATUS:
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+				pOpSetFilterStatus = (OpSetFilterStatus*)InputBuffer;
+				LogFlag = pOpSetFilterStatus->logFlag;
+				LogOnly = pOpSetFilterStatus->logOnly;
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]set filter status %d %d\n", pOpSetFilterStatus->logFlag, pOpSetFilterStatus->logOnly);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;

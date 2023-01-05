@@ -15,6 +15,7 @@ typedef enum _OpCommand {  //操作命令
 	SET_ALLOW_UNLOAD = 4,
 	SET_CONTROL_PROC = 5,
 	SET_REG_PROC = 6,
+	SET_FILTER_STATUS = 7,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -88,6 +89,12 @@ typedef struct _OpSetRegProcs {
 	UINT		regProcLen;
 } OpSetRegProcs, *POpSetRegProcs;
 
+typedef struct _OpSetFilterStatus {
+	OpCommand command;
+	DWORD logFlag;
+	DWORD logOnly;
+} OpSetFilterStatus, *POpSetFilterStatus;
+
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
 HRESULT SendSetControlProcMessage(BOOL disable);
@@ -97,6 +104,7 @@ HRESULT SendSetRegProcsMessage(POpRegProc *regProcs, UINT len);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);
 HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path);
 HRESULT SendAllowUnloadMessage(BOOL allow);
+HRESULT SendSetFilterStatusMessage(DWORD logFlag, DWORD logOnly);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
 VOID FreeRegProcList(POpRegProc *pzpRegProcs, int regProcSize);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);

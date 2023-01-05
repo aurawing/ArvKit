@@ -9,6 +9,20 @@
 extern UINT listenPort;
 extern char *keyManageAddr;
 
+typedef struct _SaveRulesParam {
+	UINT id;
+	PSTR pubkey;
+	PZPSTR paths;
+	BOOL *isDBs;
+	UINT pathLen;
+} SaveRulesParam, *PSaveRulesParam;
+
+typedef struct _SaveRegProcParam {
+	PSTR procName;
+	BOOL inherit;
+	UINT ruleID;
+} SaveRegProcParam, *PSaveRegProcParam;
+
 BOOL InitSysConfig();
 BOOL UpdateSysConfig(UINT listenPort, PSTR keyManageAddr);
 BOOL InitConfig();
@@ -16,11 +30,13 @@ PSTR PrintJsonConfig();
 void ClearConfig();
 BOOL ConfigRegProcs();
 BOOL ConfigArvFilter();
+BOOL UpdateConfigs(PSaveRulesParam params, UINT dataLen);
 BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen);
 BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB);
 PSTR LoadDBConf();
 
 BOOL InitRegProcConfig();
+BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen);
 BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add);
 void ClearRegProcConfig();
 

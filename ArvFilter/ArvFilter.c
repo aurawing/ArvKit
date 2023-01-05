@@ -899,32 +899,39 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//while (pListEntry != &filterConfig.Rules)
 		//{
 			//pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
-			PLIST_ENTRY pListEntry = pRuleEntry->Dirs.Flink;
-			while (pListEntry != &pRuleEntry->Dirs)
+		PLIST_ENTRY pListEntry = pRuleEntry->Dirs.Flink;
+		while (pListEntry != &pRuleEntry->Dirs)
+		{
+			pPathEntry = CONTAINING_RECORD(pListEntry, PathEntry, entry);
+			if (pPathEntry->Path.Length <= fullPath.Length)
 			{
-				pPathEntry = CONTAINING_RECORD(pListEntry, PathEntry, entry);
-				if (pPathEntry->Path.Length <= fullPath.Length)
+				USHORT fpLen = fullPath.Length;
+				fullPath.Length = pPathEntry->Path.Length;
+				if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0)
 				{
-					USHORT fpLen = fullPath.Length;
-					fullPath.Length = pPathEntry->Path.Length;
-					if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0)
-					{
-						fullPath.Length = fpLen;
-						flag = TRUE;
-						//ArvAddRuleEntry2(&ruleEntry2Head, pRuleEntry, pPathEntry->isDB);
-						break;
-						/*if (pPathEntry->isDB)
-						{
-							underDBPath = TRUE;
-						}
-						goto out1;*/
-					}
 					fullPath.Length = fpLen;
+					flag = TRUE;
+					//ArvAddRuleEntry2(&ruleEntry2Head, pRuleEntry, pPathEntry->isDB);
+					break;
+					/*if (pPathEntry->isDB)
+					{
+						underDBPath = TRUE;
+					}
+					goto out1;*/
 				}
-				pListEntry = pListEntry->Flink;
+				fullPath.Length = fpLen;
 			}
+			pListEntry = pListEntry->Flink;
+		}
+
+		//TODO: 限制可执行文件读取
+
 			//pListEntry = pListEntry->Flink;
 		//}
+		if (ArvGetLogOnly() == 2)
+		{
+			flag = FALSE;
+		}
 	out1:
 		if (flag)
 		{
@@ -1074,12 +1081,27 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
 		{
-			ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD-1, FALSE);
+			/*if (ArvGetLogOnly())
+			{*/
+				ArvWriteLogEx(L"create", &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
+			/*}
+			else
+			{
+				ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD - 1, FALSE);
+			}*/
+			
 			//status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 		}
 		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
 		{
-			ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD - 1, TRUE);
+			/*if (ArvGetLogOnly())
+			{*/
+				ArvWriteLogEx(L"create", &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, TRUE);
+			/*}
+			else
+			{
+				ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD - 1, TRUE);
+			}*/
 		}
 
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
@@ -1133,8 +1155,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	}
 	if (status == FLT_PREOP_COMPLETE)
 	{
-		ExFreePoolWithTag(cbdContext, 'POC');
-		cbdContext = NULL;
+		if (ArvGetLogOnly())
+		{
+			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		}
+		else
+		{
+			ExFreePoolWithTag(cbdContext, 'POC');
+			cbdContext = NULL;
+		}
 	}
 	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
 	{
@@ -1269,8 +1298,10 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	//
 	//  Increment the create count
 	//
-
-	streamContext->UnderDBPath = createContext->UnderDBPath;
+	if (createContext)
+	{
+		streamContext->UnderDBPath = createContext->UnderDBPath;
+	}
 
 
 	/*DbgPrint("[Ctx]: CtxPostCreate -> Stream context info for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
@@ -1714,11 +1745,25 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	{
 		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
 		{
-			ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, FALSE);
+			/*if (ArvGetLogOnly())
+			{*/
+				ArvWriteLogEx(L"setinfo", &fullPath, &procHead, FALSE, ForD - 1, FALSE);
+			/*}
+			else
+			{
+				ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, FALSE);
+			}*/
 		}
 		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
 		{
-			ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, TRUE);
+			/*if (ArvGetLogOnly())
+			{*/
+				ArvWriteLogEx(L"setinfo", &fullPath, &procHead, FALSE, ForD - 1, TRUE);
+			/*}
+			else
+			{
+				ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, TRUE);
+			}*/
 		}
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		//ArvFreeRuleEntry2(&ruleEntry2Head);
@@ -1758,6 +1803,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	{
 		ExFreePoolWithTag(cbdContext, 'POC');
 		cbdContext = NULL;
+		if (ArvGetLogOnly())
+		{
+			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		}
 	}
 	/*if (status == FLT_PREOP_COMPLETE && fullPath.Length)
 	{
@@ -1975,7 +2024,10 @@ out1:
 
 	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
-	streamContext->UnderDBPath = createContext->UnderDBPath;
+	if (createContext)
+	{
+		streamContext->UnderDBPath = createContext->UnderDBPath;
+	}
 
 	/*DbgPrint("[Ctx]: CtxPostSetInfo -> Old info in stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
 			&nameInfo->Name,

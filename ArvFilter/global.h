@@ -36,3 +36,6 @@ extern PFLT_PORT     gServerPort;//服务端口
 extern PFLT_PORT     gClientPort;//客户端口
 
 extern PathFilterRules SystemFilterRules;
+
+extern DWORD LogFlag;
+extern DWORD LogOnly;

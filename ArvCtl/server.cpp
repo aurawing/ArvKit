@@ -97,6 +97,108 @@ void process(WFHttpTask *server_task)
 				cJSON_Delete(root);
 			}
 		}
+		else if (ifnamestr == "saverules")
+		{
+			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
+			if (dataEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -80, \"msg\": \"data must exist\", \"data\": {}}");
+			}
+			else
+			{
+				int dataLen = cJSON_GetArraySize(dataEntry);
+				if (dataLen > 0)
+				{
+					PSaveRulesParam params = (PSaveRulesParam)malloc(dataLen * sizeof(SaveRulesParam));
+					memset(params, 0, dataLen * sizeof(SaveRulesParam));
+					bool succ = true;
+					for (int i = 0; i < dataLen; i++)
+					{
+						cJSON *pJsonDataItem = cJSON_GetArrayItem(dataEntry, i);
+						cJSON *idEntry = cJSON_GetObjectItem(pJsonDataItem, "id");
+						cJSON *pkEntry = cJSON_GetObjectItem(pJsonDataItem, "pubkey");
+						cJSON *pathEntry = cJSON_GetObjectItem(pJsonDataItem, "path");
+						if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL)
+						{
+							succ = false;
+							break;
+						}
+						params[i].id = idEntry->valueint;
+						PSTR pubkey = pkEntry->valuestring;
+						if (!VerifyPublicKey(pubkey))
+						{
+							succ = false;
+							break;
+						}
+						params[i].pubkey = pubkey;
+						int pathLen = cJSON_GetArraySize(pathEntry);
+						if (pathLen <= 0)
+						{
+							succ = false;
+							break;
+						}
+						PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
+						memset(paths, 0, pathLen * sizeof(PSTR));
+						BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
+						memset(isDBs, 0, pathLen * sizeof(BOOL));
+						for (int j = 0; j < pathLen; j++)
+						{
+							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, j);
+							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
+							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+							if (pJsonPath == NULL || pJsonIsDB == NULL)
+							{
+								succ = false;
+								goto OUTLOOP;
+							}
+							if (pJsonPath->valuestring[strlen(pJsonPath->valuestring) - 1] != '\\')
+							{
+								succ = false;
+								goto OUTLOOP;
+							}
+							paths[j] = pJsonPath->valuestring;
+							if (cJSON_IsTrue(pJsonIsDB))
+								isDBs[j] = TRUE;
+							else if (cJSON_IsFalse(pJsonIsDB))
+								isDBs[j] = FALSE;
+						}
+						params[i].paths = paths;
+						params[i].isDBs = isDBs;
+						params[i].pathLen = pathLen;
+					}
+				OUTLOOP:
+					if (!succ)
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -81, \"msg\": \"id/pubkey/path incorrect\", \"data\": {}}");
+					}
+					else
+					{
+						UpdateConfigs(params, dataLen);
+						user_resp->set_status_code("200");
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					}
+					for (int k = 0; k < dataLen; k++)
+					{
+						if (params[k].paths)
+						{
+							free(params[k].paths);
+						}
+						if (params[k].isDBs)
+						{
+							free(params[k].isDBs);
+						}
+					}
+					free(params);
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -82, \"msg\": \"no elements in data\", \"data\": {}}");
+				}
+			}
+		}
 		else if (ifnamestr == "saveconf2")
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
@@ -183,6 +285,60 @@ void process(WFHttpTask *server_task)
 						user_resp->set_status_code("500");
 						user_resp->append_output_body("{\"code\": -20, \"msg\": \"parse parameter failed\", \"data\": {}}");
 					}
+				}
+			}
+		}
+		else if (ifnamestr == "saveauths")
+		{
+			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
+			if (dataEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -90, \"msg\": \"data must exist\", \"data\": {}}");
+			}
+			else
+			{
+				int dataLen = cJSON_GetArraySize(dataEntry);
+				if (dataLen > 0)
+				{
+					PSaveRegProcParam params = (PSaveRegProcParam)malloc(dataLen * sizeof(SaveRegProcParam));
+					memset(params, 0, dataLen * sizeof(SaveRegProcParam));
+					bool succ = true;
+					for (int i = 0; i < dataLen; i++)
+					{
+						cJSON *pJsonDataItem = cJSON_GetArrayItem(dataEntry, i);
+						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
+						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
+						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
+						if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL)
+						{
+							succ = false;
+							break;
+						}
+						params[i].procName = procNameEntry->valuestring;
+						if (cJSON_IsTrue(inheritEntry))
+							params[i].inherit = true;
+						else
+							params[i].inherit = false;
+						params[i].ruleID = keyIDEntry->valueint;
+					}
+					if (!succ)
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -91, \"msg\": \"procName/inherit/keyID is NULL\", \"data\": {}}");
+					}
+					else
+					{
+						UpdateRegProcsConfig(params, dataLen);
+						user_resp->set_status_code("200");
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					}
+					free(params);
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -92, \"msg\": \"no elements in data\", \"data\": {}}");
 				}
 			}
 		}
@@ -453,10 +609,198 @@ void process(WFHttpTask *server_task)
 				}
 			}
 		}
+		else if (ifnamestr == "setstate")
+		{
+			cJSON *learnEntry = cJSON_GetObjectItem(jsonHead, "learn");
+			if (learnEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -100, \"msg\": \"learn parameter must exist\", \"data\": {}}");
+			}
+			else
+			{
+				std::string learnstr(learnEntry->valuestring);
+				bool flag = true;
+				DWORD logFlag;
+				DWORD logOnly;
+				if (learnstr == "learn")
+				{
+					logFlag = 1;
+					logOnly = 2;
+				}
+				else if (learnstr == "verify")
+				{
+					logFlag = 1;
+					logOnly = 1;
+				}
+				else if (learnstr == "enable")
+				{
+					logFlag = 1;
+					logOnly = 0;
+				}
+				else if (learnstr == "disable")
+				{
+					logFlag = 0;
+					logOnly = 2;
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -101, \"msg\": \"learn parameter must exist\", \"data\": {}}");
+					flag = false;
+				}
+				if (flag)
+				{
+					HKEY hKey = NULL;
+					TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+					LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+					if (lRet == ERROR_SUCCESS) {
+						RegDeleteValue(hKey, _T("LogFlag"));
+						if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("LogFlag"), 0, REG_DWORD, (CONST BYTE*)&logFlag, sizeof(DWORD)))
+						{
+							//RegCloseKey(hKey);
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -102, \"msg\": \"save registry of system config failed\", \"data\": {}}");
+						}
+						else
+						{
+							//RegCloseKey(hKey);
+							//user_resp->set_status_code("200");
+							//user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+							RegDeleteValue(hKey, _T("LogOnly"));
+							if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("LogOnly"), 0, REG_DWORD, (CONST BYTE*)&logOnly, sizeof(DWORD)))
+							{
+								user_resp->set_status_code("500");
+								user_resp->append_output_body("{\"code\": -103, \"msg\": \"save registry of system config failed\", \"data\": {}}");
+							}
+							else
+							{
+								SendSetFilterStatusMessage(logFlag, logOnly);
+								user_resp->set_status_code("200");
+								user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+							}
+						}
+						RegCloseKey(hKey);
+						
+					}
+					else {
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -102, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+					}
+				}
+			}
+		}
+		else if (ifnamestr == "getstate")
+		{
+			DWORD logFlag = -1;
+			DWORD logOnly = -1;
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			DWORD dwSize = sizeof(DWORD);
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("LogFlag"), NULL, NULL, (LPBYTE)&logFlag, &dwSize))
+				{
+					logFlag = 1;
+				}
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("LogOnly"), NULL, NULL, (LPBYTE)&logOnly, &dwSize))
+				{
+					logOnly = 2;
+				}
+				RegCloseKey(hKey);
+				if (logFlag == 1 && logOnly == 2)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"state\": \"learn\", \"data\": {}}");
+				}
+				else if (logFlag == 1 && logOnly == 1)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"state\": \"verify\", \"data\": {}}");
+				}
+				else if (logFlag == 1 && logOnly == 0)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"state\": \"enable\", \"data\": {}}");
+				}
+				else if (logFlag == 0 && logOnly == 2)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"state\": \"disable\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -111, \"msg\": \"invalid state\", \"data\": {}}");
+				}
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -110, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "loadlog")
+		{
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			TCHAR logPath[512];
+			DWORD logPathSize = 512;
+			DWORD dwType = REG_SZ;
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("LogPath"), NULL, &dwType, (LPBYTE)logPath, &logPathSize))
+				{
+					logPath[0] = L'\\';
+					logPath[1] = L'?';
+					logPath[2] = L'?';
+					logPath[3] = L'\\';
+					logPath[4] = L'C';
+					logPath[5] = L':';
+					logPath[6] = L'\\';
+					logPath[7] = L'f';
+					logPath[8] = L'i';
+					logPath[9] = L'l';
+					logPath[10] = L't';
+					logPath[11] = L'e';
+					logPath[12] = L'r';
+					logPath[13] = L'.';
+					logPath[14] = L'l';
+					logPath[15] = L'o';
+					logPath[16] = L'g';
+					logPath[17] = L'\0';
+				}
+				RegCloseKey(hKey);
+				TCHAR *logPathFull = &logPath[4];
+				//TODO: loop read file
+				FILE *fp1;
+				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+				if (fp1 == NULL) {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -121, \"msg\": \"open log file failed\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("200");
+					user_resp->add_header_pair("Content-Type", "application/octet-stream");
+					void *buffer = (void *)malloc(8192);
+					while (1) {
+						int op = fread(buffer, 1, 8192, fp1);
+						if (op <= 0) break;
+						user_resp->append_output_body(buffer, op);
+					}
+					free(buffer);
+					fclose(fp1);
+				}
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -120, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
 		else
 		{
 			user_resp->set_status_code("450");
-			user_resp->append_output_body("{\"code\": -99, \"msg\": \"no matched action\", \"data\": {}}");
+			user_resp->append_output_body("{\"code\": -999, \"msg\": \"no matched action\", \"data\": {}}");
 		}
 	}
 	else

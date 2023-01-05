@@ -327,6 +327,39 @@ BOOL ConfigArvFilter()
 	}
 }
 
+BOOL UpdateConfigs(PSaveRulesParam params, UINT dataLen)
+{
+	AcquireSRWLockExclusive(&configLock);
+	if (jsonConfig != NULL)
+	{
+		cJSON_Delete(jsonConfig);
+		jsonConfig = NULL;
+	}
+	jsonConfig = cJSON_CreateArray();
+	for (int i = 0; i < dataLen; i++)
+	{
+		cJSON *item = cJSON_CreateObject();
+		cJSON *pathItem = cJSON_CreateArray();
+		for (int j = 0; j < params[i].pathLen; j++)
+		{
+			cJSON *innerItem = cJSON_CreateObject();
+			cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(params[i].paths[j]));
+			cJSON_AddItemToObject(innerItem, "crypt", cJSON_CreateBool(params[i].isDBs[j]));
+			cJSON_AddItemToArray(pathItem, innerItem);
+		}
+
+		//cJSON *pathItem = cJSON_CreateStringArray(paths, pathLen);
+		cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(params[i].id));
+		cJSON_AddItemToObject(item, "pubkey", cJSON_CreateString(params[i].pubkey));
+		//cJSON_AddItemToObject(item, "url", cJSON_CreateString(url));
+		cJSON_AddItemToObject(item, "path", pathItem);
+		cJSON_AddItemToArray(jsonConfig, item);
+	}
+
+	ReleaseSRWLockExclusive(&configLock);
+	return ConfigArvFilter();
+}
+
 BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen)
 {
 	AcquireSRWLockExclusive(&configLock);
@@ -511,6 +544,38 @@ BOOL InitRegProcConfig()
 		return FALSE;
 	}
 	return TRUE;
+}
+
+BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen)
+{
+	AcquireSRWLockExclusive(&regProcLock);
+	if (regProcConfig != NULL)
+	{
+		cJSON_Delete(regProcConfig);
+		regProcConfig = NULL;
+	}
+	regProcConfig = cJSON_CreateArray();
+	for (int i = 0; i < dataLen; i++)
+	{
+		cJSON *item = cJSON_CreateObject();
+		cJSON_AddItemToObject(item, "procName", cJSON_CreateString(params[i].procName));
+		cJSON_AddItemToObject(item, "inherit", cJSON_CreateBool(params[i].inherit));
+		cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(params[i].ruleID));
+		cJSON_AddItemToArray(regProcConfig, item);
+	}
+	errno_t err;
+	FILE *fp;
+	err = _wfopen_s(&fp, regProcPath, L"wb");
+	if (err != 0)
+	{
+		ReleaseSRWLockExclusive(&regProcLock);
+		return FALSE;
+	}
+	PSTR jsonstr = cJSON_Print(regProcConfig);
+	fprintf(fp, jsonstr);
+	fclose(fp);
+	ReleaseSRWLockExclusive(&regProcLock);
+	return ConfigRegProcs();
 }
 
 BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add)

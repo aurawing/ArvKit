@@ -64,6 +64,7 @@ typedef enum _OP_COMMAND {  //操作命令
 	SET_ALLOW_UNLOAD,
 	SET_CONTROL_PROC,
 	SET_REG_PROC,
+	SET_FILTER_STATUS,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -133,6 +134,12 @@ typedef struct _OpSetRegProcs {
 	POpRegProc *regProcs;
 	UINT		regProcLen;
 } OpSetRegProcs, *POpSetRegProcs;
+
+typedef struct _OpSetFilterStatus {
+	OpCommand command;
+	DWORD logFlag;
+	DWORD logOnly;
+} OpSetFilterStatus, *POpSetFilterStatus;
 
 //用户态和内核态建立连接
 NTSTATUS

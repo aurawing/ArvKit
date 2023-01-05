@@ -144,6 +144,18 @@ HRESULT SendAllowUnloadMessage(BOOL allow)
 	return hResult;
 }
 
+HRESULT SendSetFilterStatusMessage(DWORD logFlag, DWORD logOnly)
+{
+	HRESULT hResult = S_OK;
+	OpSetFilterStatus msg;
+	memset(&msg, 0, sizeof(OpSetFilterStatus));
+	msg.command = SET_FILTER_STATUS;
+	msg.logFlag = logFlag;
+	msg.logOnly = logOnly;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode)
 {
 	DWORD dwUnicodeLen;    //转换后Unicode的长度
