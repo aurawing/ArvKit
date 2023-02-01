@@ -228,6 +228,7 @@
     <ClInclude Include="filefuncs.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="init.h" />
+    <ClInclude Include="libsha256\sha256.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Rules.h" />
     <ClInclude Include="Trace.h" />

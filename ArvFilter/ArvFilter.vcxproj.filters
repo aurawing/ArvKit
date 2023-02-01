@@ -118,5 +118,11 @@
     <ClInclude Include="Trace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rules.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="libsha256\sha256.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

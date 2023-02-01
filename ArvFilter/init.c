@@ -454,6 +454,9 @@ DWORD LogFlag = 0;
 //DWORD LogAutoClose = 0;
 DWORD LogOnly = 0;
 UNICODE_STRING LogPath = { 0 };
+UNICODE_STRING IllegalLogPath = { 0 };
+UNICODE_STRING SillegalLogPath = { 0 };
+UNICODE_STRING AbnormalLogPath = { 0 };
 
 
 NTSTATUS CleanFilterConfig()
@@ -465,6 +468,18 @@ NTSTATUS CleanFilterConfig()
 	if (LogPath.Buffer)
 	{
 		RtlFreeUnicodeString(&LogPath);
+	}
+	if (IllegalLogPath.Buffer)
+	{
+		RtlFreeUnicodeString(&IllegalLogPath);
+	}
+	if (SillegalLogPath.Buffer)
+	{
+		RtlFreeUnicodeString(&SillegalLogPath);
+	}
+	if (AbnormalLogPath.Buffer)
+	{
+		RtlFreeUnicodeString(&AbnormalLogPath);
 	}
 }
 
@@ -542,6 +557,60 @@ NTSTATUS InitFilterConfig()
 		RtlInitEmptyUnicodeString(&LogPath, Buffer, 17 * sizeof(WCHAR));
 		//¿½±´×Ö·û´®
 		RtlAppendUnicodeToString(&LogPath, L"\\??\\C:\\filter.log");
+	}
+
+	RTL_QUERY_REGISTRY_TABLE arrayTable4[2];
+	RtlZeroMemory(arrayTable4, sizeof(arrayTable4));
+	arrayTable4[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable4[0].Name = L"IllegalLogPath";
+	arrayTable4[0].EntryContext = &IllegalLogPath;
+	arrayTable4[0].DefaultType = REG_SZ;
+	arrayTable4[0].DefaultData = REG_NONE;
+	arrayTable4[0].DefaultLength = REG_NONE;
+
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable4, NULL, NULL);
+	if (!NT_SUCCESS(status) || !IllegalLogPath.Buffer)
+	{
+		PWSTR Buffer = (PWSTR)ExAllocatePool(NonPagedPool, 36);
+		RtlInitEmptyUnicodeString(&IllegalLogPath, Buffer, 18 * sizeof(WCHAR));
+		//¿½±´×Ö·û´®
+		RtlAppendUnicodeToString(&IllegalLogPath, L"\\??\\C:\\illegal.log");
+	}
+
+	RTL_QUERY_REGISTRY_TABLE arrayTable5[2];
+	RtlZeroMemory(arrayTable5, sizeof(arrayTable5));
+	arrayTable5[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable5[0].Name = L"SillegalLogPath";
+	arrayTable5[0].EntryContext = &SillegalLogPath;
+	arrayTable5[0].DefaultType = REG_SZ;
+	arrayTable5[0].DefaultData = REG_NONE;
+	arrayTable5[0].DefaultLength = REG_NONE;
+
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable5, NULL, NULL);
+	if (!NT_SUCCESS(status) || !SillegalLogPath.Buffer)
+	{
+		PWSTR Buffer = (PWSTR)ExAllocatePool(NonPagedPool, 38);
+		RtlInitEmptyUnicodeString(&SillegalLogPath, Buffer, 19 * sizeof(WCHAR));
+		//¿½±´×Ö·û´®
+		RtlAppendUnicodeToString(&SillegalLogPath, L"\\??\\C:\\sillegal.log");
+	}
+
+	RTL_QUERY_REGISTRY_TABLE arrayTable6[2];
+	RtlZeroMemory(arrayTable6, sizeof(arrayTable6));
+	arrayTable6[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable6[0].Name = L"AbnormalLogPath";
+	arrayTable6[0].EntryContext = &AbnormalLogPath;
+	arrayTable6[0].DefaultType = REG_SZ;
+	arrayTable6[0].DefaultData = REG_NONE;
+	arrayTable6[0].DefaultLength = REG_NONE;
+
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable6, NULL, NULL);
+	if (!NT_SUCCESS(status) || !AbnormalLogPath.Buffer)
+	{
+		PWSTR Buffer = (PWSTR)ExAllocatePool(NonPagedPool, 38);
+		RtlInitEmptyUnicodeString(&AbnormalLogPath, Buffer, 19 * sizeof(WCHAR));
+		//¿½±´×Ö·û´®
+		RtlAppendUnicodeToString(&AbnormalLogPath, L"\\??\\C:\\abnormal.log");
 	}
 	/*if (LogAutoClose == 1)
 	{
@@ -1076,17 +1145,34 @@ NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR proces
 	{
 		goto CLEAN;
 	}
-	USHORT pathLen = LogPath.Length;
-	LogPath.Length = 12;
-	Status = ArvQuerySymbolicLink(&LogPath, &LogVolumeName);
-	LogPath.Length = pathLen;
+	PUNICODE_STRING pLog = NULL;
+	if (LogFlag == 1 && LogOnly == 2)
+	{
+		pLog = &LogPath;
+	}
+	else if (LogFlag == 1 && LogOnly == 1)
+	{
+		pLog = &SillegalLogPath;
+	}
+	else if (LogFlag == 1 && LogOnly == 0)
+	{
+		pLog = &IllegalLogPath;
+	}
+	else
+	{
+		goto CLEAN;
+	}
+	USHORT pathLen = pLog->Length;
+	pLog->Length = 12;
+	Status = ArvQuerySymbolicLink(pLog, &LogVolumeName);
+	pLog->Length = pathLen;
 	if (!NT_SUCCESS(Status))
 	{
 		goto CLEAN;
 	}
 	InitializeObjectAttributes(
 		&ObjectAttributes,
-		&LogPath,
+		pLog,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
 		NULL);
@@ -1364,7 +1450,7 @@ Cleanup:
 
 }
 
-NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass) {
+NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass, BOOLEAN abnormal) {
 	HANDLE LogFileHandle = { 0 };
 	PFILE_OBJECT LogFileObject = { 0 };
 	PFLT_INSTANCE LogFileInstance = { 0 };
@@ -1376,7 +1462,15 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	UNICODE_STRING  LogVolumeName = { 0 };
 	PVOID Buffer = NULL;
 	UNICODE_STRING String = { 0 };
+	UNICODE_STRING logType = { 0 };
+	WCHAR logTypeBuf[10];
+	UNICODE_STRING timestamp = { 0 };
+	WCHAR timestampBuf[20];
 	IO_STATUS_BLOCK IoStatusBlock;
+
+	RtlInitEmptyUnicodeString(&logType, logTypeBuf, 10 * sizeof(WCHAR));
+	RtlInitEmptyUnicodeString(&timestamp, timestampBuf, 20 * sizeof(WCHAR));
+
 	//ExInitializeResourceLite(&LogResource);
 	//³õÊ¼»¯OBJECT_ATTRIBUTES½á¹¹Ìå
 
@@ -1385,10 +1479,51 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	{
 		goto CLEAN;
 	}
-	USHORT pathLen = LogPath.Length;
-	LogPath.Length = 12;
-	Status = ArvQuerySymbolicLink(&LogPath, &LogVolumeName);
-	LogPath.Length = pathLen;
+	PUNICODE_STRING pLog = NULL;
+	if (abnormal)
+	{
+		pLog = &AbnormalLogPath;
+		RtlAppendUnicodeToString(&logType, L"abnormal");
+		if (!pass)
+		{
+			InterlockedIncrement64(&filterConfig.abnormalCount);
+		}
+	}
+	else
+	{
+		if (LogFlag == 1 && LogOnly == 2)
+		{
+			pLog = &LogPath;
+			RtlAppendUnicodeToString(&logType, L"learn");
+		}
+		else if (LogFlag == 1 && LogOnly == 1)
+		{
+			pLog = &SillegalLogPath;
+			RtlAppendUnicodeToString(&logType, L"verify");
+			if (!pass)
+			{
+				InterlockedIncrement64(&filterConfig.sillegalCount);
+			}
+		}
+		else if (LogFlag == 1 && LogOnly == 0)
+		{
+			pLog = &IllegalLogPath;
+			RtlAppendUnicodeToString(&logType, L"enable");
+			if (!pass)
+			{
+				InterlockedIncrement64(&filterConfig.illegalCount);
+			}
+		}
+		else
+		{
+			goto CLEAN;
+		}
+	}
+	
+	USHORT pathLen = pLog->Length;
+	pLog->Length = 12;
+	Status = ArvQuerySymbolicLink(pLog, &LogVolumeName);
+	pLog->Length = pathLen;
 	if (!NT_SUCCESS(Status))
 	{
 		goto CLEAN;
@@ -1396,7 +1531,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 
 	InitializeObjectAttributes(
 		&ObjectAttributes,
-		&LogPath,
+		pLog,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
 		NULL);
@@ -1449,44 +1584,45 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	}
 
 	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\D:\\arv\\filter.log");
-	ULONG bufsize = 18 + path->Length + 44 + 56; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n"}\n
+	ULONG bufsize = 18 + path->Length + 49 + 56 + 40; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n","time":1673578456,"logtype":"abnormal"}\n
 	for (UINT i = 0; i < path->Length / sizeof(wchar_t); i++) {
 		if (path->Buffer[i] == L'\\')
 		{
 			bufsize += sizeof(wchar_t);
 		}
 	}
-	
-	PLIST_ENTRY pListEntry = pProcHead->Flink;
-	while (pListEntry != pProcHead)
+	if (pProcHead)
 	{
-		PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
-		PUNICODE_STRING pTempStr = NULL;
-		Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
-		if (!NT_SUCCESS(Status))
+		PLIST_ENTRY pListEntry = pProcHead->Flink;
+		while (pListEntry != pProcHead)
 		{
-			if (pTempStr)
+			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
+			PUNICODE_STRING pTempStr = NULL;
+			Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
+			if (!NT_SUCCESS(Status))
 			{
-				ExFreePoolWithTag(pTempStr, 'ipgD');
-			}
-			//goto CLEAN;
-		}
-		else 
-		{
-			bufsize += pTempStr->Length;
-			bufsize += 6;
-			for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++) {
-				if (pTempStr->Buffer[i] == L'\\')
+				if (pTempStr)
 				{
-					bufsize += sizeof(wchar_t);
+					ExFreePoolWithTag(pTempStr, 'ipgD');
 				}
+				//goto CLEAN;
 			}
-			ExFreePoolWithTag(pTempStr, 'ipgD');
-			pTempStr = NULL;
+			else
+			{
+				bufsize += pTempStr->Length;
+				bufsize += 6;
+				for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++) {
+					if (pTempStr->Buffer[i] == L'\\')
+					{
+						bufsize += sizeof(wchar_t);
+					}
+				}
+				ExFreePoolWithTag(pTempStr, 'ipgD');
+				pTempStr = NULL;
+			}
+			pListEntry = pListEntry->Flink;
 		}
-		pListEntry = pListEntry->Flink;
 	}
-
 	Buffer = (PWCHAR)ExAllocatePoolWithTag(NonPagedPool, bufsize, 'LogT');
 	if (NULL == Buffer)
 	{
@@ -1495,7 +1631,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	//³õÊ¼»¯×Ö·û´®Ö¸Õë
 	RtlInitEmptyUnicodeString(&String, Buffer, bufsize);
 	//¿½±´×Ö·û´®
-	RtlAppendUnicodeToString(&String, L"{\"path\":\"");
+	RtlAppendUnicodeToString(&String, L"{\"E\":\"");
 	//RtlAppendUnicodeStringToString(&String, path);
 	for (UINT i = 0; i < path->Length / sizeof(wchar_t); i++)
 	{
@@ -1509,53 +1645,57 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 			//String.MaximumLength = String.Length;
 		}
 	}
-	RtlAppendUnicodeToString(&String, L"\",\"type\":\"");
-	if (read)
+	RtlAppendUnicodeToString(&String, L"\",\"B\":\"");
+	/*if (read)
 	{
 		RtlAppendUnicodeToString(&String, L"r");
 	}
 	else
 	{
 		RtlAppendUnicodeToString(&String, L"w");
-	}
-	RtlAppendUnicodeToString(&String, L"\",\"procs\":[");
-	pListEntry = pProcHead->Flink;
-	while (pListEntry != pProcHead)
+	}*/
+	RtlAppendUnicodeToString(&String, type);
+	RtlAppendUnicodeToString(&String, L"\",\"D\":[");
+	if (pProcHead)
 	{
-		PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
-		PUNICODE_STRING pTempStr = NULL;
-		Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
-		if (!NT_SUCCESS(Status))
+		PLIST_ENTRY pListEntry = pProcHead->Flink;
+		while (pListEntry != pProcHead)
 		{
-			if (pTempStr)
+			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
+			PUNICODE_STRING pTempStr = NULL;
+			Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
+			if (!NT_SUCCESS(Status))
 			{
-				ExFreePoolWithTag(pTempStr, 'ipgD');
+				if (pTempStr)
+				{
+					ExFreePoolWithTag(pTempStr, 'ipgD');
+				}
+				//goto CLEAN;
 			}
-			//goto CLEAN;
-		}
-		else
-		{
-			RtlAppendUnicodeToString(&String, L"\"");
-			//RtlAppendUnicodeStringToString(&String, pTempStr);
-			for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++)
+			else
 			{
-				String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
-				String.Length += sizeof(wchar_t);
-				//String.MaximumLength = String.Length;
-				if (pTempStr->Buffer[i] == L'\\')
+				RtlAppendUnicodeToString(&String, L"\"");
+				//RtlAppendUnicodeStringToString(&String, pTempStr);
+				for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++)
 				{
 					String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
 					String.Length += sizeof(wchar_t);
 					//String.MaximumLength = String.Length;
+					if (pTempStr->Buffer[i] == L'\\')
+					{
+						String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
+						String.Length += sizeof(wchar_t);
+						//String.MaximumLength = String.Length;
+					}
 				}
+				RtlAppendUnicodeToString(&String, L"\",");
+				ExFreePoolWithTag(pTempStr, 'ipgD');
+				pTempStr = NULL;
 			}
-			RtlAppendUnicodeToString(&String, L"\",");
-			ExFreePoolWithTag(pTempStr, 'ipgD');
-			pTempStr = NULL;
+			pListEntry = pListEntry->Flink;
 		}
-		pListEntry = pListEntry->Flink;
+		String.Length -= sizeof(wchar_t);
 	}
-	String.Length -= sizeof(wchar_t);
 	RtlAppendUnicodeToString(&String, L"],\"folder\":\"");
 	if (isFolder)
 	{
@@ -1574,6 +1714,12 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	{
 		RtlAppendUnicodeToString(&String, L"n");
 	}
+	RtlAppendUnicodeToString(&String, L"\",\"A\":");
+	ULONG now = ArvGetUnixTimestamp();
+	Status = RtlIntegerToUnicodeString(now, 10, &timestamp);
+	RtlAppendUnicodeStringToString(&String, &timestamp);
+	RtlAppendUnicodeToString(&String, L",\"C\":\"");
+	RtlAppendUnicodeStringToString(&String, &logType);
 	RtlAppendUnicodeToString(&String, L"\"}\r\n");
 
 	/*if (!LogFileInstance)

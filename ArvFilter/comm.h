@@ -65,6 +65,9 @@ typedef enum _OP_COMMAND {  //操作命令
 	SET_CONTROL_PROC,
 	SET_REG_PROC,
 	SET_FILTER_STATUS,
+	SET_EXE_ALLOWED_PATHS,
+	SET_REG_PROC_TMP,
+	SET_ABNORMAL_THRESHOLD,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -116,6 +119,8 @@ typedef struct _RepStat { //返回统计信息
 	ULONGLONG Write;
 	ULONGLONG ReadDB;
 	ULONGLONG WriteDB;
+	ULONGLONG Sillegal;
+	ULONGLONG Abnormal;
 } RepStat, *PRepStat;
 
 typedef struct _OpSetControlProc { //修改控制进程ID
@@ -140,6 +145,17 @@ typedef struct _OpSetFilterStatus {
 	DWORD logFlag;
 	DWORD logOnly;
 } OpSetFilterStatus, *POpSetFilterStatus;
+
+typedef struct _OpSetExeAllowedPaths {
+	OpCommand command;
+	PZPWSTR paths;
+	UINT	len;
+} OpSetExeAllowedPaths, *POpSetExeAllowedPaths;
+
+typedef struct _OpSetAbnormalThreshold { 
+	OpCommand command;
+	UINT threshold;
+} OpSetAbnormalThreshold, *POpSetAbnormalThreshold;
 
 //用户态和内核态建立连接
 NTSTATUS

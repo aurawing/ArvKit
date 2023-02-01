@@ -15,4 +15,4 @@ VOID ArvCleanLog();
 VOID ArvDeleteLogResource();
 NTSTATUS ArvInitLog(PFLT_FILTER pFilter);
 NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR processName, BOOLEAN read, BOOLEAN isFile, BOOLEAN pass);
-NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass);
+NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass, BOOLEAN abnormal);

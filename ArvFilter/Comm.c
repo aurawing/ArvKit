@@ -152,6 +152,8 @@ MiniMessage(
 		OpSetControlProc *pOpSetControlProc = NULL;
 		OpSetRegProcs *pOpSetRegProcs = NULL;
 		OpSetFilterStatus *pOpSetFilterStatus = NULL;
+		OpSetExeAllowedPaths *pOpSetExeAllowedPaths = NULL;
+		OpSetAbnormalThreshold *pOpSetAbnormalThreshold = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -187,6 +189,8 @@ MiniMessage(
 				ArvInitializeFilterConfig(&tmpConfig);
 				tmpConfig.readCount = filterConfig.readCount;
 				tmpConfig.writeCount = filterConfig.writeCount;
+				tmpConfig.readCountDB = filterConfig.readCountDB;
+				tmpConfig.writeCountDB = filterConfig.writeCountDB;
 				pOpSetRules = (OpSetRules*)InputBuffer;
 				controlProcID = pOpSetRules->controlProcID;
 				for (UINT i = 0; i < pOpSetRules->ruleLen; i++)
@@ -236,6 +240,7 @@ MiniMessage(
 				}
 				ArvFreeRules(&filterConfig);
 				tmpConfig.RegProcs = filterConfig.RegProcs;
+				tmpConfig.ExeAllowedPath = filterConfig.ExeAllowedPath;
 				filterConfig = tmpConfig;
 				if (pOpSetRules->ruleLen > 0)
 				{
@@ -300,7 +305,8 @@ MiniMessage(
 					pListEntry = pListEntry->Flink;
 				}
 				pStats->KeyCount = keyCount;
-				pStats->Block = blockTotal;
+				//pStats->Block = blockTotal;
+				pStats->Block = filterConfig.illegalCount;
 				pStats->Pass = passTotal;
 				pStats->BlockDB = blockTotalDB;
 				pStats->PassDB = passTotalDB;
@@ -308,6 +314,8 @@ MiniMessage(
 				pStats->Write = filterConfig.writeCount;
 				pStats->ReadDB = filterConfig.readCountDB;
 				pStats->WriteDB = filterConfig.writeCountDB;
+				pStats->Sillegal = filterConfig.sillegalCount;
+				pStats->Abnormal = filterConfig.abnormalCount;
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				*ReturnOutputBufferLength = (ULONG)sizeof(RepStat);
 				break;
@@ -327,6 +335,53 @@ MiniMessage(
 				LogOnly = pOpSetFilterStatus->logOnly;
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				DbgPrint("[FsFilter:MiniMessage]set filter status %d %d\n", pOpSetFilterStatus->logFlag, pOpSetFilterStatus->logOnly);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_EXE_ALLOWED_PATHS:
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+				pOpSetExeAllowedPaths = (OpSetExeAllowedPaths*)InputBuffer;
+				ArvFreeExeAllowedPaths(&filterConfig);
+				ArvAddExeAllowedPaths(&filterConfig, pOpSetExeAllowedPaths->paths, pOpSetExeAllowedPaths->len);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]set exe allowed paths status %d\n", pOpSetExeAllowedPaths->len);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_REG_PROC_TMP:
+				ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
+				pOpSetRegProcs = (OpSetRegProcs*)InputBuffer;
+				//ArvFreeRegProcs(&filterConfig);
+				for (UINT i = 0; i < pOpSetRegProcs->regProcLen; i++)
+				{
+					PLIST_ENTRY pListEntry = filterConfig.RegProcs.Flink;
+					BOOL flag = TRUE;
+					while (pListEntry != &filterConfig.RegProcs)
+					{
+						PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
+						if (strcmp(pRegProcEntry->ProcName, pOpSetRegProcs->regProcs[i]->procName) == 0)
+						{
+							//ArvProcessFlagAdd(&processFlags, pProcIndex->ProcessId, pRegProcEntry->Inherit, pRegProcEntry->RuleID);
+							flag = FALSE;
+							break;
+						}
+						pListEntry = pListEntry->Flink;
+					}
+					if (flag)
+					{
+						ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->ruleID);
+					}
+				}
+				RecoveryRegProcs(&filterConfig);
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				DbgPrint("[FsFilter:MiniMessage]refresh reg proc list");
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_ABNORMAL_THRESHOLD:
+				pOpSetAbnormalThreshold = (OpSetAbnormalThreshold*)InputBuffer;
+				ArvAbnormalCounterSetThreshold(&abnormalCounters, pOpSetAbnormalThreshold->threshold);
+				DbgPrint("[FsFilter:MiniMessage]set abnormal threshold: %d\n", pOpSetAbnormalThreshold->threshold);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;

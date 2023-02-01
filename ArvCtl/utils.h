@@ -16,6 +16,9 @@ typedef enum _OpCommand {  //操作命令
 	SET_CONTROL_PROC = 5,
 	SET_REG_PROC = 6,
 	SET_FILTER_STATUS = 7,
+	SET_EXE_ALLOWED_PATHS = 8,
+	SET_REG_PROC_TMP = 9,
+	SET_ABNORMAL_THRESHOLD = 10,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -70,6 +73,8 @@ typedef struct _RepStat { //返回统计信息
 	ULONGLONG Write;
 	ULONGLONG ReadDB;
 	ULONGLONG WriteDB;
+	ULONGLONG Sillegal;
+	ULONGLONG Abnormal;
 } RepStat, *PRepStat;
 
 typedef struct _ArvDiskInfo {
@@ -95,16 +100,30 @@ typedef struct _OpSetFilterStatus {
 	DWORD logOnly;
 } OpSetFilterStatus, *POpSetFilterStatus;
 
+typedef struct _OpSetExeAllowedPaths {
+	OpCommand command;
+	PZPWSTR paths;
+	UINT	len;
+} OpSetExeAllowedPaths, *POpSetExeAllowedPaths;
+
+typedef struct _OpSetAbnormalThreshold {
+	OpCommand command;
+	UINT threshold;
+} OpSetAbnormalThreshold, *POpSetAbnormalThreshold;
+
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
 HRESULT SendSetControlProcMessage(BOOL disable);
 HRESULT GetStatistics(__inout LPVOID OutBuffer, __in DWORD dwInBufferSize, __out DWORD *bytesReturned);
 HRESULT SendSetProcMessage(ULONG procID, UINT ruleID);
 HRESULT SendSetRegProcsMessage(POpRegProc *regProcs, UINT len);
+HRESULT SendSetAuthProcMessage(POpRegProc *regProcs, UINT len);
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len);
 HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path);
 HRESULT SendAllowUnloadMessage(BOOL allow);
 HRESULT SendSetFilterStatusMessage(DWORD logFlag, DWORD logOnly);
+HRESULT SendSetExeAllowedPathMessage(PZPWSTR paths, UINT len);
+HRESULT SendSetAbnormalThresholdMessage(UINT threshold);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
 VOID FreeRegProcList(POpRegProc *pzpRegProcs, int regProcSize);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);

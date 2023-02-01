@@ -13,6 +13,10 @@ cJSON *daemonConfig = NULL;
 TCHAR daemonPath[MAX_PATH];
 SRWLOCK daemonLock;
 
+cJSON *exeAllowedPathConfig = NULL;
+TCHAR exeAllowedPathPath[MAX_PATH];
+SRWLOCK exeAllowedPathLock;
+
 TCHAR serConfigPath[MAX_PATH];
 UINT listenPort;
 char *keyManageAddr;
@@ -237,6 +241,48 @@ BOOL ConfigRegProcs()
 	}
 
 	ReleaseSRWLockShared(&regProcLock);
+	if (result != S_OK)
+	{
+		return FALSE;
+	}
+	else
+	{
+		return TRUE;
+	}
+}
+
+BOOL ConfigExeAllowedPath()
+{
+	if (exeAllowedPathConfig == NULL)
+	{
+		return TRUE;
+	}
+	AcquireSRWLockShared(&exeAllowedPathLock);
+	int exeAllowedPathSize = cJSON_GetArraySize(exeAllowedPathConfig);
+	/*cJSON *pJsonRegProc;
+	cJSON *pJsonRegProcItem;
+	POpRegProc pRegProc;
+	POpRegProc *pzpRegProcs;*/
+	HRESULT result = S_OK;
+	if (exeAllowedPathSize > 0)
+	{
+		PZPWSTR paths = (PZPWSTR)malloc(exeAllowedPathSize * sizeof(PWSTR));
+
+		for (int i = 0; i < exeAllowedPathSize; i++)
+		{
+			cJSON *pJsonPathItem = cJSON_GetArrayItem(exeAllowedPathConfig, i);
+			UTF8ToUnicode(pJsonPathItem->valuestring, &paths[i]);
+		}
+		result = SendSetExeAllowedPathMessage(paths, exeAllowedPathSize);
+		for (int j = 0; j < exeAllowedPathSize; j++)
+		{
+			free(paths[j]);
+		}
+		free(paths);
+		paths = NULL;
+	}
+
+	ReleaseSRWLockShared(&exeAllowedPathLock);
 	if (result != S_OK)
 	{
 		return FALSE;
@@ -546,6 +592,69 @@ BOOL InitRegProcConfig()
 	return TRUE;
 }
 
+BOOL UpdateAuthProcsConfig(PSaveRegProcParam params, UINT regProcSize)
+{
+	/*cJSON *authProcConfig = cJSON_CreateArray();
+	for (int i = 0; i < regProcSize; i++)
+	{
+		cJSON *item = cJSON_CreateObject();
+		cJSON_AddItemToObject(item, "procName", cJSON_CreateString(params[i].procName));
+		cJSON_AddItemToObject(item, "inherit", cJSON_CreateBool(params[i].inherit));
+		cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(params[i].ruleID));
+		cJSON_AddItemToArray(authProcConfig, item);
+	}*/
+	AcquireSRWLockShared(&regProcLock);
+	//cJSON *pJsonRegProc;
+	//cJSON *pJsonRegProcItem;
+	POpRegProc pRegProc;
+	POpRegProc *pzpRegProcs;
+	HRESULT result = S_OK;
+	if (regProcSize > 0)
+	{
+		pzpRegProcs = (POpRegProc*)malloc(regProcSize * sizeof(POpRegProc));
+		for (int i = 0; i < regProcSize; i++)
+		{
+			pRegProc = (POpRegProc)malloc(sizeof(OpRegProc));
+			//pJsonRegProc = cJSON_GetArrayItem(regProcConfig, i);
+
+			//pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "procName");
+			pRegProc->procName = (PSTR)malloc(sizeof(char)*(strlen(params[i].procName) + 1));
+			strcpy_s(pRegProc->procName, sizeof(char)*(strlen(params[i].procName) + 1), params[i].procName);
+
+			//pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "keyID");
+			pRegProc->ruleID = params[i].ruleID;
+
+			//pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "inherit");
+			/*pRegProc->inherit = params[i].inherit;
+			if (cJSON_IsTrue(TRUE))
+				pRegProc->inherit = params[i].inherit;
+			else if (cJSON_IsFalse(pJsonRegProcItem))
+				pRegProc->inherit = FALSE;*/
+
+			pzpRegProcs[i] = pRegProc;
+		}
+		result = SendSetAuthProcMessage(pzpRegProcs, regProcSize);
+		for (int i = 0; i < regProcSize; i++)
+		{
+			POpRegProc pOpRegProc = pzpRegProcs[i];
+			free(pOpRegProc);
+			pOpRegProc = NULL;
+		}
+		free(pzpRegProcs);
+		pzpRegProcs = NULL;
+	}
+
+	ReleaseSRWLockShared(&regProcLock);
+	if (result != S_OK)
+	{
+		return FALSE;
+	}
+	else
+	{
+		return TRUE;
+	}
+}
+
 BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen)
 {
 	AcquireSRWLockExclusive(&regProcLock);
@@ -646,6 +755,101 @@ void ClearRegProcConfig()
 		regProcConfig = NULL;
 	}
 	ReleaseSRWLockExclusive(&regProcLock);
+}
+
+BOOL InitExeAllowedPathConfig()
+{
+	InitializeSRWLock(&exeAllowedPathLock);
+	GetModuleFileName(NULL, exeAllowedPathPath, MAX_PATH);
+	WCHAR *ch = wcsrchr(exeAllowedPathPath, '\\');
+	ch[1] = L'e';
+	ch[2] = L'x';
+	ch[3] = L'e';
+	ch[4] = L'A';
+	ch[5] = L'l';
+	ch[6] = L'l';
+	ch[7] = L'o';
+	ch[8] = L'w';
+	ch[9] = L'e';
+	ch[10] = L'd';
+	ch[11] = L'.';
+	ch[12] = L'j';
+	ch[13] = L's';
+	ch[14] = L'o';
+	ch[15] = L'n';
+	ch[16] = L'\0';
+	errno_t err;
+	FILE *fp;
+	int file_size;
+	if (_waccess(exeAllowedPathPath, 0))
+	{
+		exeAllowedPathConfig = cJSON_Parse("[]");
+		return TRUE;
+	}
+	err = _wfopen_s(&fp, exeAllowedPathPath, L"rb");
+	if (err != 0)
+	{
+		exeAllowedPathConfig = cJSON_Parse("[]");
+		return FALSE;
+	}
+	fseek(fp, 0, SEEK_END);
+	file_size = ftell(fp);
+	char *tmp;
+	fseek(fp, 0, SEEK_SET);
+	size_t allocSize = file_size * sizeof(char) + sizeof(char);
+	tmp = (char *)malloc(allocSize);
+	memset(tmp, 0, allocSize);
+	fread(tmp, sizeof(char), file_size, fp);
+	fclose(fp);
+	AcquireSRWLockExclusive(&exeAllowedPathLock);
+	exeAllowedPathConfig = cJSON_Parse(tmp);
+	free(tmp);
+	ReleaseSRWLockExclusive(&exeAllowedPathLock);
+	if (exeAllowedPathConfig == NULL)
+	{
+		exeAllowedPathConfig = cJSON_Parse("[]");
+		return FALSE;
+	}
+	return ConfigExeAllowedPath();
+}
+
+BOOL UpdateExeAllowedPathConfig(PZPSTR paths, UINT len)
+{
+	AcquireSRWLockExclusive(&exeAllowedPathLock);
+	if (exeAllowedPathConfig != NULL)
+	{
+		cJSON_Delete(exeAllowedPathConfig);
+		exeAllowedPathConfig = NULL;
+	}
+	exeAllowedPathConfig = cJSON_CreateArray();
+	for (int i = 0; i < len; i++)
+	{
+		cJSON_AddItemToArray(exeAllowedPathConfig, cJSON_CreateString(paths[i]));
+	}
+	errno_t err;
+	FILE *fp;
+	err = _wfopen_s(&fp, exeAllowedPathPath, L"wb");
+	if (err != 0)
+	{
+		ReleaseSRWLockExclusive(&exeAllowedPathLock);
+		return FALSE;
+	}
+	PSTR jsonstr = cJSON_Print(exeAllowedPathConfig);
+	fprintf(fp, jsonstr);
+	fclose(fp);
+	ReleaseSRWLockExclusive(&exeAllowedPathLock);
+	return ConfigExeAllowedPath();
+}
+
+void ClearExeAllowedPathConfig()
+{
+	AcquireSRWLockExclusive(&exeAllowedPathLock);
+	if (exeAllowedPathConfig != NULL)
+	{
+		cJSON_Delete(exeAllowedPathConfig);
+		exeAllowedPathConfig = NULL;
+	}
+	ReleaseSRWLockExclusive(&exeAllowedPathLock);
 }
 
 

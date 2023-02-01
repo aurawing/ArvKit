@@ -28,6 +28,7 @@ extern PFLT_FILTER g_minifilterHandle;
 extern PDEVICE_OBJECT gDeviceObject;
 extern FilterConfig filterConfig;
 extern ProcessFlags processFlags;
+extern AbnormalCounters abnormalCounters;
 extern ERESOURCE HashResource;
 extern ULONG controlProcID;
 extern BOOL AllowUnload;

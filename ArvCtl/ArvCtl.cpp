@@ -217,6 +217,14 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	{
 		WriteToLog((char*)"in InitDaemonConfig(), parse daemon.json failed!");
 	}
+	if (InitExeAllowedPathConfig())
+	{
+		WriteToLog((char*)"in InitExeAllowedPathConfig(), parse exeAllowedPath.json success!");
+	}
+	else
+	{
+		WriteToLog((char*)"in InitExeAllowedPathConfig(), parse exeAllowedPath.json failed!");
+	}
 
 	gSvcStatusHandle = RegisterServiceCtrlHandler(
 		SVC_NAME,
@@ -293,6 +301,13 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 	if (!ConfigRegProcs())
 	{
 		WriteToLog((char*)"in SvcInit(), config reg procs failed!");
+		fclose(logfile);
+		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
+	if (!ConfigExeAllowedPath())
+	{
+		WriteToLog((char*)"in SvcInit(), config exe allowed paths failed!");
 		fclose(logfile);
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;

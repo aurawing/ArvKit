@@ -5,6 +5,7 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 {
 	InitializeListHead(&pFilterConfig->Rules);
 	InitializeListHead(&pFilterConfig->RegProcs);
+	InitializeListHead(&pFilterConfig->ExeAllowedPath);
 }
 
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen)
@@ -350,6 +351,73 @@ VOID ArvFreeRegProcs(PFilterConfig pFilterConfig)
 	}
 }
 
+BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path)
+{
+	BOOL ret = TRUE;
+	PLIST_ENTRY pListEntry = pFilterConfig->ExeAllowedPath.Flink;
+	while (pListEntry != &pFilterConfig->ExeAllowedPath)
+	{
+		PPathEntry pPathEntry = CONTAINING_RECORD(pListEntry, PathEntry, entry);
+		USHORT fpLen = path->Length;
+		path->Length = pPathEntry->Path.Length;
+		if (RtlCompareUnicodeString(path, &pPathEntry->Path, TRUE) == 0)
+		{
+			path->Length = fpLen;
+			if (path->Length >= sizeof(WCHAR) * 4)
+			{
+				UNICODE_STRING usExeBuffer = RTL_CONSTANT_STRING(L".exe");
+				UNICODE_STRING usDllBuffer = RTL_CONSTANT_STRING(L".dll");
+				UNICODE_STRING usJarBuffer = RTL_CONSTANT_STRING(L".jar");
+				UNICODE_STRING usImageExtBuffer = { 0 };
+				WCHAR szBuffer[4] = { 0 };
+				PUCHAR pBuffer = (PUCHAR)path->Buffer + path->Length - sizeof(WCHAR) * 4;
+				RtlCopyMemory(szBuffer, pBuffer, sizeof(WCHAR) * 4);
+				RtlInitUnicodeString(&usImageExtBuffer, szBuffer);
+				usImageExtBuffer.Length = usImageExtBuffer.MaximumLength = sizeof(WCHAR) * 4;
+				if (RtlEqualUnicodeString(&usExeBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usDllBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usJarBuffer, &usImageExtBuffer, true))
+				{
+					ret = TRUE;
+					break;
+				}
+			}
+		}
+		path->Length = fpLen;
+		pListEntry = pListEntry->Flink;
+		ret = FALSE;
+	}
+	return ret;
+}
+
+VOID ArvAddExeAllowedPaths(PFilterConfig pFilterConfig, PZPWSTR paths, UINT pathsLen)
+{
+	for (UINT j = 0; j < pathsLen; j++)
+	{
+		PWSTR path = paths[j];
+		size_t pathLen = wcslen(path);
+		PPathEntry pPathEntry = (PPathEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(PathEntry), 'PTE');
+		RtlZeroMemory(pPathEntry, sizeof(PathEntry));
+		pPathEntry->Path.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, pathLen * sizeof(wchar_t), 'PTE');
+		for (UINT k = 0; k < pathLen; k++)
+		{
+			pPathEntry->Path.Buffer[k] = path[k];
+		}
+		pPathEntry->Path.Length = pPathEntry->Path.MaximumLength = (USHORT)pathLen * sizeof(wchar_t);
+		InsertTailList(&pFilterConfig->ExeAllowedPath, &pPathEntry->entry);
+	}
+}
+
+VOID ArvFreeExeAllowedPaths(PFilterConfig pFilterConfig)
+{
+	while (pFilterConfig->ExeAllowedPath.Flink != &pFilterConfig->ExeAllowedPath)
+	{
+		PLIST_ENTRY pDelExeAllowedPathEntry = RemoveTailList(&pFilterConfig->ExeAllowedPath);
+		PPathEntry pDelExeAllowedPath = CONTAINING_RECORD(pDelExeAllowedPathEntry, PathEntry, entry);
+		RtlFreeUnicodeString(&pDelExeAllowedPath->Path);
+		ExFreePoolWithTag(pDelExeAllowedPath, 'POC');
+		pDelExeAllowedPath = NULL;
+	}
+}
+
 VOID ArvProcessFlagInit(PProcessFlags pFlags)
 {
 	ExInitializeResourceLite(&pFlags->Res);
@@ -480,4 +548,122 @@ PPathEntry ArvFindPathByPrefix(PFilterConfig pFilterConfig, PUNICODE_STRING path
 		pListEntry = pListEntry->Flink;
 	}
 	return NULL;
+}
+
+VOID ArvAbnormalCounterInit(PAbnormalCounters counters)
+{
+	ExInitializeResourceLite(&counters->Res);
+}
+
+VOID ArvAbnormalCounterRelease(PAbnormalCounters counters)
+{
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
+	PAbnormalCounter currentCounter, tmp;
+	HASH_ITER(hh, counters->counters, currentCounter, tmp) {
+		HASH_DEL(counters->counters, currentCounter);
+		if (currentCounter->Path.Buffer)
+		{
+			ExFreePoolWithTag(currentCounter->Path.Buffer, 'pcfg');
+		}
+		ExFreePoolWithTag(currentCounter, 'pcfg');
+		currentCounter = NULL;
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
+	ExDeleteResourceLite(&counters->Res);
+}
+
+VOID ArvAbnormalCounterAdd(PAbnormalCounters counters, UINT pid)
+{
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
+	PAbnormalCounter counter = (PAbnormalCounter)ExAllocatePoolWithTag(NonPagedPool, sizeof(AbnormalCounter), 'pcfg');
+	RtlZeroMemory(counter, sizeof(AbnormalCounter));
+	counter->Pid = pid;
+	HASH_ADD_INT(counters->counters, Pid, counter);
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
+}
+
+VOID ArvAbnormalCounterDelete(PAbnormalCounters counters, UINT pid)
+{
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
+	PAbnormalCounter counter = NULL;
+	HASH_FIND_INT(counters->counters, &pid, counter);
+	if (counter)
+	{
+		HASH_DEL(counters->counters, counter);
+		if (counter->Path.Buffer)
+		{
+			ExFreePoolWithTag(counter->Path.Buffer, 'pcfg');
+		}
+		ExFreePoolWithTag(counter, 'pcfg');
+		counter = NULL;
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
+}
+
+VOID ArvAbnormalCounterCheck(PAbnormalCounters counters, UINT pid, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass)
+{
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
+	PAbnormalCounter counter = NULL;
+	HASH_FIND_INT(counters->counters, &pid, counter);
+	if (counter)
+	{
+		if (counter->Path.Buffer && RtlEqualUnicodeString(&counter->Path, path, TRUE))
+		{
+			counter->Counter++;
+			if (counter->Counter == counters->Threshold)
+			{
+				counter->Forbid = TRUE;
+				PWSTR optype = NULL;
+				if (read)
+				{
+					optype = L"read";
+				}
+				else
+				{
+					optype = L"write";
+				}
+				ArvWriteLogEx(optype, path, pProcHead, read, isFolder, pass, TRUE);
+				InterlockedIncrement64(&filterConfig.abnormalCount);
+			}
+		}
+		else
+		{
+			if (counter->Path.Buffer)
+			{
+				ExFreePoolWithTag(counter->Path.Buffer, 'pcfg');
+			}
+			counter->Path.Buffer = ExAllocatePoolWithTag(NonPagedPool, path->MaximumLength, 'pcfg');
+			counter->Path.Length = 0;
+			counter->Path.MaximumLength = path->MaximumLength;
+			RtlAppendUnicodeStringToString(&counter->Path, path);
+			counter->Counter = 1;
+			counter->Forbid = FALSE;
+		}
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
+}
+
+BOOL ArvAbnormalCounterIfForbid(PAbnormalCounters counters, UINT pid)
+{
+	BOOL ret = FALSE;
+	ExEnterCriticalRegionAndAcquireResourceShared(&counters->Res);
+	PAbnormalCounter counter = NULL;
+	HASH_FIND_INT(counters->counters, &pid, counter);
+	if (counter && counter->Forbid)
+	{
+		ret = TRUE;
+	}
+	else
+	{
+		ret = FALSE;
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
+	return ret;
+}
+
+VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold)
+{
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
+	counters->Threshold = threshold;
+	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
 }

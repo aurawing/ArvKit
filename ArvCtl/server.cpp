@@ -19,6 +19,7 @@
 #include <string.h>
 #include <tchar.h>
 #include <string>
+#include <tlhelp32.h>
 #include "workflow/HttpMessage.h"
 #include "workflow/HttpUtil.h"
 #include "workflow/WFServer.h"
@@ -91,6 +92,8 @@ void process(WFHttpTask *server_task)
 				cJSON_AddItemToObject(item, "dbwritenumber", cJSON_CreateNumber(kernelStat.WriteDB));
 				cJSON_AddItemToObject(item, "dbreadnumber", cJSON_CreateNumber(kernelStat.ReadDB));
 				cJSON_AddItemToObject(item, "dbillegalaccess", cJSON_CreateNumber(kernelStat.BlockDB));
+				cJSON_AddItemToObject(item, "sillegalaccess", cJSON_CreateNumber(kernelStat.Sillegal));
+				cJSON_AddItemToObject(item, "abnormalnum", cJSON_CreateNumber(kernelStat.Abnormal));
 				char* jsonstr = cJSON_Print(root);
 				user_resp->append_output_body(jsonstr);
 				user_resp->set_status_code("200");
@@ -339,6 +342,67 @@ void process(WFHttpTask *server_task)
 				{
 					user_resp->set_status_code("500");
 					user_resp->append_output_body("{\"code\": -92, \"msg\": \"no elements in data\", \"data\": {}}");
+				}
+			}
+		}
+		else if (ifnamestr == "authproc")
+		{
+			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
+			if (dataEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -170, \"msg\": \"data must exist\", \"data\": {}}");
+			}
+			else
+			{
+				int dataLen = cJSON_GetArraySize(dataEntry);
+				if (dataLen > 0)
+				{
+					PSaveRegProcParam params = (PSaveRegProcParam)malloc(dataLen * sizeof(SaveRegProcParam));
+					memset(params, 0, dataLen * sizeof(SaveRegProcParam));
+					bool succ = true;
+					for (int i = 0; i < dataLen; i++)
+					{
+						cJSON *pJsonDataItem = cJSON_GetArrayItem(dataEntry, i);
+						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
+						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
+						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
+						if (procNameEntry == NULL || inheritEntry == NULL)
+						{
+							succ = false;
+							break;
+						}
+						params[i].procName = procNameEntry->valuestring;
+						if (cJSON_IsTrue(inheritEntry))
+							params[i].inherit = true;
+						else
+							params[i].inherit = false;
+						if (keyIDEntry == NULL)
+						{
+							params[i].ruleID = 1;
+						}
+						else
+						{
+							params[i].ruleID = keyIDEntry->valueint;
+						}
+					}
+					if (!succ)
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -171, \"msg\": \"procName/inherit/keyID is NULL\", \"data\": {}}");
+					}
+					else
+					{
+						UpdateAuthProcsConfig(params, dataLen);
+						user_resp->set_status_code("200");
+						user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					}
+					free(params);
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -172, \"msg\": \"no elements in data\", \"data\": {}}");
 				}
 			}
 		}
@@ -611,11 +675,11 @@ void process(WFHttpTask *server_task)
 		}
 		else if (ifnamestr == "setstate")
 		{
-			cJSON *learnEntry = cJSON_GetObjectItem(jsonHead, "learn");
+			cJSON *learnEntry = cJSON_GetObjectItem(jsonHead, "state");
 			if (learnEntry == NULL)
 			{
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -100, \"msg\": \"learn parameter must exist\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -100, \"msg\": \"state parameter must exist\", \"data\": {}}");
 			}
 			else
 			{
@@ -795,6 +859,278 @@ void process(WFHttpTask *server_task)
 			else {
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -120, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "illegalaccess")
+		{
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			TCHAR logPath[512];
+			DWORD logPathSize = 512;
+			DWORD dwType = REG_SZ;
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("IllegalLogPath"), NULL, &dwType, (LPBYTE)logPath, &logPathSize))
+				{
+					logPath[0] = L'\\';
+					logPath[1] = L'?';
+					logPath[2] = L'?';
+					logPath[3] = L'\\';
+					logPath[4] = L'C';
+					logPath[5] = L':';
+					logPath[6] = L'\\';
+					logPath[7] = L'i';
+					logPath[8] = L'l';
+					logPath[9] = L'l';
+					logPath[10] = L'e';
+					logPath[11] = L'g';
+					logPath[12] = L'a';
+					logPath[13] = L'l';
+					logPath[14] = L'.';
+					logPath[15] = L'l';
+					logPath[16] = L'o';
+					logPath[17] = L'g';
+					logPath[18] = L'\0';
+				}
+				RegCloseKey(hKey);
+				TCHAR *logPathFull = &logPath[4];
+				//TODO: loop read file
+				FILE *fp1;
+				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+				if (fp1 == NULL) {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -131, \"msg\": \"open log file failed\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("200");
+					user_resp->add_header_pair("Content-Type", "application/octet-stream");
+					void *buffer = (void *)malloc(8192);
+					while (1) {
+						int op = fread(buffer, 1, 8192, fp1);
+						if (op <= 0) break;
+						user_resp->append_output_body(buffer, op);
+					}
+					free(buffer);
+					fclose(fp1);
+				}
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -130, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "sillegalaccess")
+		{
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			TCHAR logPath[512];
+			DWORD logPathSize = 512;
+			DWORD dwType = REG_SZ;
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("SillegalLogPath"), NULL, &dwType, (LPBYTE)logPath, &logPathSize))
+				{
+					logPath[0] = L'\\';
+					logPath[1] = L'?';
+					logPath[2] = L'?';
+					logPath[3] = L'\\';
+					logPath[4] = L'C';
+					logPath[5] = L':';
+					logPath[6] = L'\\';
+					logPath[7] = L's';
+					logPath[8] = L'i';
+					logPath[9] = L'l';
+					logPath[10] = L'l';
+					logPath[11] = L'e';
+					logPath[12] = L'g';
+					logPath[13] = L'a';
+					logPath[14] = L'l';
+					logPath[15] = L'.';
+					logPath[16] = L'l';
+					logPath[17] = L'o';
+					logPath[18] = L'g';
+					logPath[19] = L'\0';
+				}
+				RegCloseKey(hKey);
+				TCHAR *logPathFull = &logPath[4];
+				//TODO: loop read file
+				FILE *fp1;
+				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+				if (fp1 == NULL) {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -141, \"msg\": \"open log file failed\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("200");
+					user_resp->add_header_pair("Content-Type", "application/octet-stream");
+					void *buffer = (void *)malloc(8192);
+					while (1) {
+						int op = fread(buffer, 1, 8192, fp1);
+						if (op <= 0) break;
+						user_resp->append_output_body(buffer, op);
+					}
+					free(buffer);
+					fclose(fp1);
+				}
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -140, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "abnormal")
+		{
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			TCHAR logPath[512];
+			DWORD logPathSize = 512;
+			DWORD dwType = REG_SZ;
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("AbnormalLogPath"), NULL, &dwType, (LPBYTE)logPath, &logPathSize))
+				{
+					logPath[0] = L'\\';
+					logPath[1] = L'?';
+					logPath[2] = L'?';
+					logPath[3] = L'\\';
+					logPath[4] = L'C';
+					logPath[5] = L':';
+					logPath[6] = L'\\';
+					logPath[7] = L'a';
+					logPath[8] = L'b';
+					logPath[9] = L'n';
+					logPath[10] = L'o';
+					logPath[11] = L'r';
+					logPath[12] = L'm';
+					logPath[13] = L'a';
+					logPath[14] = L'l';
+					logPath[15] = L'.';
+					logPath[16] = L'l';
+					logPath[17] = L'o';
+					logPath[18] = L'g';
+					logPath[19] = L'\0';
+				}
+				RegCloseKey(hKey);
+				TCHAR *logPathFull = &logPath[4];
+				//TODO: loop read file
+				FILE *fp1;
+				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+				if (fp1 == NULL) {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -151, \"msg\": \"open log file failed\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("200");
+					user_resp->add_header_pair("Content-Type", "application/octet-stream");
+					void *buffer = (void *)malloc(8192);
+					while (1) {
+						int op = fread(buffer, 1, 8192, fp1);
+						if (op <= 0) break;
+						user_resp->append_output_body(buffer, op);
+					}
+					free(buffer);
+					fclose(fp1);
+				}
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -150, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "saveexeallowedpaths")
+		{
+			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
+			if (dataEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -160, \"msg\": \"data must exist\", \"data\": {}}");
+			}
+			else
+			{
+				int dataLen = cJSON_GetArraySize(dataEntry);
+				if (dataLen > 0)
+				{
+					PZPSTR paths = (PZPSTR)malloc(sizeof(PSTR)*dataLen);
+					for (int i = 0; i < dataLen; i++)
+					{
+						cJSON *pJsonDataItem = cJSON_GetArrayItem(dataEntry, i);
+						paths[i] = pJsonDataItem->valuestring;
+					}
+					UpdateExeAllowedPathConfig(paths, dataLen);
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+					free(paths);
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -161, \"msg\": \"no elements in data\", \"data\": {}}");
+				}
+			}
+		}
+		else if (ifnamestr == "setabnormalthreshold")
+		{
+			cJSON *thresholdEntry = cJSON_GetObjectItem(jsonHead, "threshold");
+			if (thresholdEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -170, \"msg\": \"tghreshold parameter must exist\", \"data\": {}}");
+			}
+			else
+			{
+				UINT threshold = thresholdEntry->valueint;
+				SendSetAbnormalThresholdMessage(threshold);
+				user_resp->set_status_code("200");
+				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+			}
+		}
+		else if (ifnamestr == "killproc")
+		{
+			cJSON *procEntry = cJSON_GetObjectItem(jsonHead, "procname");
+			if (procEntry == NULL)
+			{
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -180, \"msg\": \"procname parameter must exist\", \"data\": {}}");
+			}
+			else
+			{
+				bool flag = false;
+				PWSTR procname = NULL;
+				UTF8ToUnicode(procEntry->valuestring, &procname);
+				HANDLE hSnapShot =(HANDLE)CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+				PROCESSENTRY32 pEntry;
+				pEntry.dwSize = sizeof(pEntry);
+				BOOL hRes = Process32First(hSnapShot, &pEntry);
+				while (hRes)
+				{
+					if (_wcsicmp(pEntry.szExeFile, procname) == 0 && pEntry.th32ProcessID != GetCurrentProcessId())
+					{
+						HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, 0,
+							(DWORD)pEntry.th32ProcessID);
+						if (hProcess != NULL)
+						{
+							TerminateProcess(hProcess, 9);
+							CloseHandle(hProcess);
+							flag = true;
+						}
+					}
+					hRes = Process32Next(hSnapShot, &pEntry);
+				}
+				CloseHandle(hSnapShot);
+				free(procname);
+				if (flag)
+				{
+					user_resp->set_status_code("200");
+					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				}
+				else
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": 181, \"msg\": \"no process killed\", \"data\": {}}");
+				}
 			}
 		}
 		else

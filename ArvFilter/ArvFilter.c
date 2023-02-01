@@ -29,6 +29,7 @@ NTKERNELAPI UCHAR* PsGetProcessImageFileName(IN PEPROCESS Process);
 
 //PDRIVER_OBJECT pDriverObject = { 0 };
 ProcessFlags processFlags = { 0 };
+AbnormalCounters abnormalCounters = { 0 };
 FilterConfig filterConfig = { 0 };
 ERESOURCE HashResource = { 0 };
 ULONG controlProcID = 0;
@@ -36,6 +37,7 @@ PFLT_FILTER g_minifilterHandle = NULL;
 PDEVICE_OBJECT gDeviceObject = NULL;
 BOOL AllowUnload = TRUE;
 PathFilterRules SystemFilterRules = { 0 };
+UINT DefaultRuleID = 2;
 
 // 获取全部父进程ID
 VOID FindAncestorProcessID(ULONG processID, PLIST_ENTRY pProcHead)
@@ -351,6 +353,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		*CompletionContext = cbdContext;
 		return status;
 	}
+	if (ArvAbnormalCounterIfForbid(&abnormalCounters, procID))
+	{
+		*CompletionContext = cbdContext;
+		return status;
+	}
 	//check processname
 	PEPROCESS pCallerProcess = NULL;
 	char *callerProcessName = "";
@@ -462,65 +469,69 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			inherit = 0;
 		}
-		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
-		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
-		if (wPubKey == NULL)
+		PSTR pubKey = NULL;
+		if (keyid != DefaultRuleID)
 		{
-			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			cbdContext = NULL;
-			return FLT_PREOP_COMPLETE;
-		}
-		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
-		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
-		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
-		{
-			if (wPubKey->Buffer[c] < 256)
+			ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
+			PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
+			if (wPubKey == NULL)
 			{
-				pubKey[c] = wPubKey->Buffer[c];
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				cbdContext = NULL;
+				return FLT_PREOP_COMPLETE;
 			}
-			else
+			pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
+			RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
+			for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
 			{
-				isWChar = true; //路径不应包含多字节字符
-				break;
+				if (wPubKey->Buffer[c] < 256)
+				{
+					pubKey[c] = wPubKey->Buffer[c];
+				}
+				else
+				{
+					isWChar = true; //路径不应包含多字节字符
+					break;
+				}
 			}
-		}
-		if (isWChar)
-		{
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(pubKey, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			pubKey = NULL;
-			cbdContext = NULL;
+			if (isWChar)
+			{
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(pubKey, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				pubKey = NULL;
+				cbdContext = NULL;
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				return FLT_PREOP_COMPLETE;
+			}
+			for (UINT d = 0; d < 4; d++)
+			{
+				logintag[bPoint[d]] = '\\';
+			}
+			bool verified = ArvVerifySig(logintag, sigstr, pubKey);
+			if (!verified)
+			{
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(pubKey, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				pubKey = NULL;
+				cbdContext = NULL;
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				return FLT_PREOP_COMPLETE;
+			}
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			return FLT_PREOP_COMPLETE;
 		}
-		for (UINT d = 0; d < 4; d++)
-		{
-			logintag[bPoint[d]] = '\\';
-		}
-		bool verified = ArvVerifySig(logintag, sigstr, pubKey);
-		if (!verified)
-		{
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(pubKey, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			pubKey = NULL;
-			cbdContext = NULL;
-			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			return FLT_PREOP_COMPLETE;
-		}
-		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
 		//ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0)
@@ -535,7 +546,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 		//ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ExFreePoolWithTag(logintag, 'LGI');
-		ExFreePoolWithTag(pubKey, 'LGI');
+		if (pubKey)
+		{
+			ExFreePoolWithTag(pubKey, 'LGI');
+		}
 		ExFreePoolWithTag(cbdContext, 'POC');
 		logintag = NULL;
 		pubKey = NULL;
@@ -647,69 +661,73 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			inherit = 0;
 		}
-		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
-		PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
-		if (wPubKey == NULL)
+		PSTR pubKey = NULL;
+		if (keyid != DefaultRuleID)
 		{
-			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			cbdContext = NULL;
-			return FLT_PREOP_COMPLETE;
-		}
-		PSTR pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
-		RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
-		for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
-		{
-			if (wPubKey->Buffer[c] < 256)
+			ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
+			PUNICODE_STRING wPubKey = ArvGetPubKeyByRuleID(&filterConfig, keyid);
+			if (wPubKey == NULL)
 			{
-				pubKey[c] = wPubKey->Buffer[c];
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				cbdContext = NULL;
+				return FLT_PREOP_COMPLETE;
 			}
-			else
+			pubKey = (PSTR)ExAllocatePoolWithTag(NonPagedPool, wPubKey->Length / sizeof(wchar_t) + 1, 'LGI');
+			RtlZeroMemory(pubKey, wPubKey->Length / sizeof(wchar_t) + 1);
+			for (UINT c = 0; c < wPubKey->Length / sizeof(wchar_t); c++)
 			{
-				isWChar = true; //路径不应包含多字节字符
-				break;
+				if (wPubKey->Buffer[c] < 256)
+				{
+					pubKey[c] = wPubKey->Buffer[c];
+				}
+				else
+				{
+					isWChar = true; //路径不应包含多字节字符
+					break;
+				}
 			}
-		}
-		if (isWChar)
-		{
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(pubKey, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			pubKey = NULL;
-			cbdContext = NULL;
+			if (isWChar)
+			{
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(pubKey, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				pubKey = NULL;
+				cbdContext = NULL;
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				return FLT_PREOP_COMPLETE;
+			}
+			for (UINT d = 0; d < 5; d++)
+			{
+				logintag[bPoint[d]] = '\\';
+			}
+			bool verified = ArvVerifySig(logintag, sigstr, pubKey);
+			if (!verified)
+			{
+				Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
+				Data->IoStatus.Information = 0;
+				ExFreePoolWithTag(logintag, 'LGI');
+				ExFreePoolWithTag(pubKey, 'LGI');
+				ExFreePoolWithTag(cbdContext, 'POC');
+				logintag = NULL;
+				pubKey = NULL;
+				cbdContext = NULL;
+				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
+				return FLT_PREOP_COMPLETE;
+			}
+			for (UINT d = 0; d < 5; d++)
+			{
+				logintag[bPoint[d]] = '\0';
+			}
 			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			return FLT_PREOP_COMPLETE;
 		}
-		for (UINT d = 0; d < 5; d++)
-		{
-			logintag[bPoint[d]] = '\\';
-		}
-		bool verified = ArvVerifySig(logintag, sigstr, pubKey);
-		if (!verified)
-		{
-			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
-			Data->IoStatus.Information = 0;
-			ExFreePoolWithTag(logintag, 'LGI');
-			ExFreePoolWithTag(pubKey, 'LGI');
-			ExFreePoolWithTag(cbdContext, 'POC');
-			logintag = NULL;
-			pubKey = NULL;
-			cbdContext = NULL;
-			ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
-			return FLT_PREOP_COMPLETE;
-		}
-		for (UINT d = 0; d < 5; d++)
-		{
-			logintag[bPoint[d]] = '\0';
-		}
-		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 
 		ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0)
@@ -730,7 +748,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		ExFreePoolWithTag(logintag, 'LGI');
-		ExFreePoolWithTag(pubKey, 'LGI');
+		if (pubKey)
+		{
+			ExFreePoolWithTag(pubKey, 'LGI');
+		}
 		ExFreePoolWithTag(cbdContext, 'POC');
 		logintag = NULL;
 		pubKey = NULL;
@@ -889,43 +910,53 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			goto out1;
 		}
-		pRuleEntry = ArvGetRuleEntryByRuleID(&filterConfig, pFlag->RuleID);
-		if (!pRuleEntry)
+		if (pFlag->RuleID == DefaultRuleID)
 		{
-			goto out1;
+			flag = TRUE;
 		}
-		
-		//PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
-		//while (pListEntry != &filterConfig.Rules)
-		//{
-			//pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
-		PLIST_ENTRY pListEntry = pRuleEntry->Dirs.Flink;
-		while (pListEntry != &pRuleEntry->Dirs)
+		else
 		{
-			pPathEntry = CONTAINING_RECORD(pListEntry, PathEntry, entry);
-			if (pPathEntry->Path.Length <= fullPath.Length)
+			pRuleEntry = ArvGetRuleEntryByRuleID(&filterConfig, pFlag->RuleID);
+			if (!pRuleEntry)
 			{
-				USHORT fpLen = fullPath.Length;
-				fullPath.Length = pPathEntry->Path.Length;
-				if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0)
-				{
-					fullPath.Length = fpLen;
-					flag = TRUE;
-					//ArvAddRuleEntry2(&ruleEntry2Head, pRuleEntry, pPathEntry->isDB);
-					break;
-					/*if (pPathEntry->isDB)
-					{
-						underDBPath = TRUE;
-					}
-					goto out1;*/
-				}
-				fullPath.Length = fpLen;
+				goto out1;
 			}
-			pListEntry = pListEntry->Flink;
+
+			//PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+			//while (pListEntry != &filterConfig.Rules)
+			//{
+				//pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+			PLIST_ENTRY pListEntry = pRuleEntry->Dirs.Flink;
+			while (pListEntry != &pRuleEntry->Dirs)
+			{
+				pPathEntry = CONTAINING_RECORD(pListEntry, PathEntry, entry);
+				if (pPathEntry->Path.Length <= fullPath.Length)
+				{
+					USHORT fpLen = fullPath.Length;
+					fullPath.Length = pPathEntry->Path.Length;
+					if (RtlCompareUnicodeString(&fullPath, &pPathEntry->Path, TRUE) == 0)
+					{
+						fullPath.Length = fpLen;
+						flag = TRUE;
+						//ArvAddRuleEntry2(&ruleEntry2Head, pRuleEntry, pPathEntry->isDB);
+						break;
+						/*if (pPathEntry->isDB)
+						{
+							underDBPath = TRUE;
+						}
+						goto out1;*/
+					}
+					fullPath.Length = fpLen;
+				}
+				pListEntry = pListEntry->Flink;
+			}
 		}
 
 		//TODO: 限制可执行文件读取
-
+		if (!flag && ArvIfExeAllowedPath(&filterConfig, &fullPath))
+		{
+			flag = TRUE;
+		}
 			//pListEntry = pListEntry->Flink;
 		//}
 		if (ArvGetLogOnly() == 2)
@@ -935,13 +966,17 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	out1:
 		if (flag)
 		{
-			cbdContext->UnderDBPath = pPathEntry->isDB;
-			InterlockedIncrement64(&pPathEntry->stat.passCounter);
-			if (cbdContext->UnderDBPath)
+			if (pFlag && pFlag->RuleID != DefaultRuleID)
 			{
-				InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+				cbdContext->UnderDBPath = pPathEntry->isDB;
+
+				InterlockedIncrement64(&pPathEntry->stat.passCounter);
+				if (cbdContext->UnderDBPath)
+				{
+					InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+				}
+				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
 			}
-			DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
 		}
 		else
 		{
@@ -950,23 +985,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 			{
 				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
-				//if (MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
-				//{
-				//	DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-				//	//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-				//}
-				//else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || RtlPrefixUnicodeString(&ExpAllow5, &fullPath, TRUE) == TRUE))
-				//{
-				//	DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-				//}
-				//else
-				//{
-				//	DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-				//	//InterlockedIncrement64(&pPathEntry->stat.blockCounter);
-				//	Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-				//	Data->IoStatus.Information = 0;
-				//	status = FLT_PREOP_COMPLETE;
-				//}
 			}
 			else
 			{
@@ -989,84 +1007,23 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				else
 				{
 					DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-					pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
-					if (pathEntry2)
+					if (pFlag && pFlag->RuleID != DefaultRuleID)
 					{
-						InterlockedIncrement64(&pathEntry2->stat.blockCounter);
-						if (pathEntry2->isDB)
+						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
+						if (pathEntry2)
 						{
-							InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
+							if (pathEntry2->isDB)
+							{
+								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
+							}
 						}
 					}
 					Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 					Data->IoStatus.Information = 0;
 					status = FLT_PREOP_COMPLETE;
+					ArvAbnormalCounterCheck(&abnormalCounters, procID, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
 				}
-
-//				/*if (Data && Data->Iopb && (Data->Iopb->MajorFunction == IRP_MJ_CREATE))
-//				{*/
-//				//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-//				if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, SystemRoot, 3 * sizeof(wchar_t)) == 0)
-//				{
-//					//if (ProcAllowed(procID) || (MatchReadonlyProcess(procID) && FILE_OPEN == createDisposition))
-//					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
-//					{
-//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-////InterlockedIncrement64(&pPathEntry->stat.passCounter);
-//					}
-//					else if (ProcAllowedPaths(procID, callerProcessName, &fullPath))
-//					{
-//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//					}
-//					/*else if (_stricmp(callerProcessName, "Explorer.EXE") == 0 && (ArvFindSubString(&fullPath, &ExpAllow1) || ArvFindSubString(&fullPath, &ExpAllow2) || ArvFindSubString(&fullPath, &ExpAllow3) || ArvFindSubString(&fullPath, &ExpAllow4) || ArvFindSubString(&fullPath, &ExpAllow5) || RtlPrefixUnicodeString(&ExpAllow6, &fullPath, TRUE) == TRUE ) || RtlEqualUnicodeString(&fullPath, &ExpAllow7, TRUE) || ArvIfMatchUnicodeString(ExpAllows, &fullPath, sizeof(ExpAllows)/sizeof(ExpAllows[0])))
-//					{
-//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//					}
-//					else if (RtlPrefixUnicodeString(&ExpAllow21, &fullPath, TRUE) || RtlPrefixUnicodeString(&ExpAllow22, &fullPath, TRUE) ||  RtlEqualUnicodeString(&fullPath, &ExpAllow23, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow24, TRUE) || RtlEqualUnicodeString(&fullPath, &ExpAllow25, TRUE))
-//					{
-//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//					}*/
-//					else
-//					{
-//						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
-//						if (pathEntry2)
-//						{
-//							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
-//							if (pathEntry2->isDB)
-//							{
-//								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
-//							}
-//						}
-//						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-//						Data->IoStatus.Information = 0;
-//						status = FLT_PREOP_COMPLETE;
-//					}
-//				}
-//				else
-//				{
-//					if (ProcAllowed(procID) || MatchReadWriteProcess(callerProcessName) || (MatchReadonlyProcess(callerProcessName) && FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
-//					{
-//						DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//						//InterlockedIncrement64(&pPathEntry->stat.passCounter);
-//					}
-//					else
-//					{
-//						DbgPrint("[FsFilter:create]unallowed process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
-//						pathEntry2 = ArvFindPathByPrefix(&filterConfig, &fullPath);
-//						if (pathEntry2)
-//						{
-//							InterlockedIncrement64(&pathEntry2->stat.blockCounter);
-//							if (pathEntry2->isDB)
-//							{
-//								InterlockedIncrement64(&pathEntry2->stat.blockCounterDB);
-//							}
-//						}
-//						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-//						Data->IoStatus.Information = 0;
-//						status = FLT_PREOP_COMPLETE;
-//					}
-//				}
 			}
 		}
 	}
@@ -1083,7 +1040,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			/*if (ArvGetLogOnly())
 			{*/
-				ArvWriteLogEx(L"create", &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
+			PWSTR optype = NULL;
+			if (FILE_OPEN == createDisposition)
+			{
+				optype = L"read";
+			}
+			else
+			{
+				optype = L"write";
+			}
+				ArvWriteLogEx(optype, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE, FALSE);
 			/*}
 			else
 			{
@@ -1096,7 +1062,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			/*if (ArvGetLogOnly())
 			{*/
-				ArvWriteLogEx(L"create", &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, TRUE);
+			PWSTR optype = NULL;
+			if (FILE_OPEN == createDisposition)
+			{
+				optype = L"read";
+			}
+			else
+			{
+				optype = L"write";
+			}
+				ArvWriteLogEx(optype, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, TRUE, FALSE);
 			/*}
 			else
 			{
@@ -1419,6 +1394,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	//
 	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	NTSTATUS status2 = STATUS_SUCCESS;
+	PWSTR optype = L"";
 	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
@@ -1568,16 +1544,22 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		{
 			goto out1;
 		}
-		pRuleEntry = ArvGetRuleEntryByRuleID(&filterConfig, pFlag->RuleID);
-		if (!pRuleEntry)
+		if (pFlag->RuleID == DefaultRuleID)
 		{
-			goto out1;
+			flag = TRUE;
 		}
+		else
+		{
+			pRuleEntry = ArvGetRuleEntryByRuleID(&filterConfig, pFlag->RuleID);
+			if (!pRuleEntry)
+			{
+				goto out1;
+			}
 
-		//PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
-		//while (pListEntry != &filterConfig.Rules)
-		//{
-			//pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
+			//PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
+			//while (pListEntry != &filterConfig.Rules)
+			//{
+				//pRuleEntry = CONTAINING_RECORD(pListEntry, RuleEntry, entry);
 			PLIST_ENTRY pListEntry = pRuleEntry->Dirs.Flink;
 			while (pListEntry != &pRuleEntry->Dirs)
 			{
@@ -1599,17 +1581,20 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			}
 			//pListEntry = pListEntry->Flink;
 		//}
+		}
 	out1:
 		if (flag)
 		{
-			cbdContext->UnderDBPath = pPathEntry->isDB;
-			InterlockedIncrement64(&pPathEntry->stat.passCounter);
-			if (cbdContext->UnderDBPath)
+			if (pFlag && pFlag->RuleID != DefaultRuleID)
 			{
-				InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+				cbdContext->UnderDBPath = pPathEntry->isDB;
+				InterlockedIncrement64(&pPathEntry->stat.passCounter);
+				if (cbdContext->UnderDBPath)
+				{
+					InterlockedIncrement64(&pPathEntry->stat.passCounterDB);
+				}
+				DbgPrint("[FsFilter:setinfo]unauthorized process: %d - %wZ\n", procID, fullPath);
 			}
-			DbgPrint("[FsFilter:setinfo]unauthorized process: %d - %wZ\n", procID, fullPath);
-
 		}
 		else
 		{
@@ -1683,6 +1668,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 								status = FLT_PREOP_COMPLETE;
 							}
 							blocked = TRUE;
+							optype = L"delete";
 							break;
 						case FileRenameInformation:
 						case 65:
@@ -1692,6 +1678,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 							Data->IoStatus.Information = 0;
 							status = FLT_PREOP_COMPLETE;
 							blocked = TRUE;
+							optype = L"rename";
 							break;
 						}
 						if (blocked)
@@ -1747,7 +1734,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		{
 			/*if (ArvGetLogOnly())
 			{*/
-				ArvWriteLogEx(L"setinfo", &fullPath, &procHead, FALSE, ForD - 1, FALSE);
+				ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, FALSE, FALSE);
 			/*}
 			else
 			{
@@ -1758,7 +1745,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		{
 			/*if (ArvGetLogOnly())
 			{*/
-				ArvWriteLogEx(L"setinfo", &fullPath, &procHead, FALSE, ForD - 1, TRUE);
+				ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, TRUE, FALSE);
 			/*}
 			else
 			{
@@ -2217,6 +2204,7 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 	NTSTATUS status;
 	if (Create)
 	{
+		ArvAbnormalCounterAdd(&abnormalCounters, ChildId);
 		status = PsLookupProcessByProcessId(ChildId, &ChildEprocess);
 		if (!NT_SUCCESS(status))
 		{
@@ -2278,6 +2266,7 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 	else
 	{
 		ArvProcessFlagDelete(&processFlags, ChildId);
+		ArvAbnormalCounterDelete(&abnormalCounters, ChildId);
 	}
 EXIT:
 	if (ParentEprocess)
@@ -2353,6 +2342,7 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 	PsSetCreateProcessNotifyRoutine(CreateProcessNotify, TRUE);
 	ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 	ArvFreeRegProcs(&filterConfig);
+	ArvFreeExeAllowedPaths(&filterConfig);
 	ArvFreeRules(&filterConfig);
 	ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 	ExDeleteResourceLite(&HashResource);
@@ -2368,6 +2358,7 @@ NTSTATUS FLTAPI InstanceFilterUnloadCallback(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 		IoDeleteDevice(gDeviceObject);
 	}
 	ArvProcessFlagRelease(&processFlags);
+	ArvAbnormalCounterRelease(&abnormalCounters);
 	//WPP_CLEANUP(pDriverObject);
 	//CleanFilterPaths();
 	ArvSysPathFilterRulesRelease(&SystemFilterRules);
@@ -2748,6 +2739,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 			__leave;
 		}*/
 		ArvProcessFlagInit(&processFlags);
+		ArvAbnormalCounterInit(&abnormalCounters);
 		ArvInitializeFilterConfig(&filterConfig);
 		ExInitializeResourceLite(&HashResource);
 		status = FltRegisterFilter(DriverObject, &g_filterRegistration, &g_minifilterHandle);
@@ -2849,6 +2841,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 			}
 			ExDeleteResourceLite(&HashResource);
 			ArvProcessFlagRelease(&processFlags);
+			ArvAbnormalCounterRelease(&abnormalCounters);
 		}
 	}
 

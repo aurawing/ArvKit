@@ -2,6 +2,7 @@
 
 #include <windef.h>
 #include "uthash.h"
+#include "sha256.h"
 
 typedef struct _PathStat {
 	volatile ULONGLONG passCounter;
@@ -50,10 +51,14 @@ typedef struct _RegProcEntry {
 typedef struct _FilterConfig {
 	LIST_ENTRY Rules;
 	LIST_ENTRY RegProcs;
+	LIST_ENTRY ExeAllowedPath;
 	volatile ULONGLONG readCount;
 	volatile ULONGLONG writeCount;
 	volatile ULONGLONG readCountDB;
 	volatile ULONGLONG writeCountDB;
+	volatile ULONGLONG illegalCount;
+	volatile ULONGLONG sillegalCount;
+	volatile ULONGLONG abnormalCount;
 } FilterConfig, *PFilterConfig;
 
 typedef struct _ProcessFlag {
@@ -74,6 +79,20 @@ typedef struct _ParamData {
 	BOOLEAN Create;
 } ParamData, *PParamData;
 
+typedef struct _AbnormalCounter {
+	UINT Pid;
+	UNICODE_STRING Path;
+	ULONGLONG Counter;
+	BOOL Forbid;
+	UT_hash_handle hh;
+} AbnormalCounter, *PAbnormalCounter;
+
+typedef struct _AbnormalCounters {
+	PAbnormalCounter counters;
+	UINT Threshold;
+	ERESOURCE Res;
+} AbnormalCounters, *PAbnormalCounters;
+
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
 PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
 //BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
@@ -93,6 +112,9 @@ PRegProcEntry ArvGetRegProcEntryByRegProcName(PFilterConfig pFilterConfig, PSTR 
 VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UINT ruleID);
 BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);
 VOID ArvFreeRegProcs(PFilterConfig pFilterConfig);
+BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path);
+VOID ArvAddExeAllowedPaths(PFilterConfig pFilterConfig, PZPWSTR paths, UINT pathsLen);
+VOID ArvFreeExeAllowedPaths(PFilterConfig pFilterConfig);
 VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);
 
 VOID ArvProcessFlagInit(PProcessFlags pFlags);
@@ -106,3 +128,11 @@ int ArvGetTime();
 ULONG ArvGetUnixTimestamp();
 
 PPathEntry ArvFindPathByPrefix(PFilterConfig pFilterConfig, PUNICODE_STRING path);
+
+VOID ArvAbnormalCounterInit(PAbnormalCounters counters);
+VOID ArvAbnormalCounterRelease(PAbnormalCounters counters);
+VOID ArvAbnormalCounterAdd(PAbnormalCounters counters, UINT pid);
+VOID ArvAbnormalCounterDelete(PAbnormalCounters counters, UINT pid);
+VOID ArvAbnormalCounterCheck(PAbnormalCounters counters, UINT pid, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass);
+BOOL ArvAbnormalCounterIfForbid(PAbnormalCounters counters, UINT pid);
+VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold);

@@ -108,6 +108,18 @@ HRESULT SendSetRegProcsMessage(POpRegProc *regProcs, UINT len)
 	return hResult;
 }
 
+HRESULT SendSetAuthProcMessage(POpRegProc *regProcs, UINT len)
+{
+	HRESULT hResult = S_OK;
+	OpSetRegProcs msg;
+	memset(&msg, 0, sizeof(OpSetRegProcs));
+	msg.command = SET_REG_PROC_TMP;
+	msg.regProcs = regProcs;
+	msg.regProcLen = len;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
 HRESULT SendSetRulesMessage(POpRule *rules, UINT len)
 {
 	HRESULT hResult = S_OK;
@@ -152,6 +164,29 @@ HRESULT SendSetFilterStatusMessage(DWORD logFlag, DWORD logOnly)
 	msg.command = SET_FILTER_STATUS;
 	msg.logFlag = logFlag;
 	msg.logOnly = logOnly;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
+HRESULT SendSetExeAllowedPathMessage(PZPWSTR paths, UINT len)
+{
+	HRESULT hResult = S_OK;
+	OpSetExeAllowedPaths msg;
+	memset(&msg, 0, sizeof(OpSetExeAllowedPaths));
+	msg.command = SET_EXE_ALLOWED_PATHS;
+	msg.paths = paths;
+	msg.len = len;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
+HRESULT SendSetAbnormalThresholdMessage(UINT threshold)
+{
+	HRESULT hResult = S_OK;
+	OpSetAbnormalThreshold msg;
+	memset(&msg, 0, sizeof(OpSetAbnormalThreshold));
+	msg.command = SET_ABNORMAL_THRESHOLD;
+	msg.threshold = threshold;
 	hResult = SendToDriver(&msg.command, sizeof(msg));
 	return hResult;
 }
