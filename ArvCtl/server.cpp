@@ -58,7 +58,7 @@ void process(WFHttpTask *server_task)
 		return;
 	}
 	cJSON *ifname = cJSON_GetObjectItem(jsonHead, "name");
-	if (ifname != NULL)
+	if (ifname != NULL && ifname->type == cJSON_String)
 	{
 		std::string ifnamestr(ifname->valuestring);
 		if (ifnamestr == "statinfo")
@@ -103,7 +103,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "saverules")
 		{
 			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
-			if (dataEntry == NULL)
+			if (dataEntry == NULL || dataEntry->type != cJSON_Array)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -80, \"msg\": \"data must exist\", \"data\": {}}");
@@ -122,7 +122,7 @@ void process(WFHttpTask *server_task)
 						cJSON *idEntry = cJSON_GetObjectItem(pJsonDataItem, "id");
 						cJSON *pkEntry = cJSON_GetObjectItem(pJsonDataItem, "pubkey");
 						cJSON *pathEntry = cJSON_GetObjectItem(pJsonDataItem, "path");
-						if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL)
+						if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL || idEntry->type != cJSON_Number || pkEntry->type != cJSON_String || pathEntry->type != cJSON_Array)
 						{
 							succ = false;
 							break;
@@ -150,7 +150,7 @@ void process(WFHttpTask *server_task)
 							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, j);
 							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
-							if (pJsonPath == NULL || pJsonIsDB == NULL)
+							if (pJsonPath == NULL || pJsonIsDB == NULL || pJsonPath->type != cJSON_String || (pJsonIsDB->type != cJSON_True && pJsonIsDB->type != cJSON_False))
 							{
 								succ = false;
 								goto OUTLOOP;
@@ -208,7 +208,7 @@ void process(WFHttpTask *server_task)
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
 			cJSON *pkEntry = cJSON_GetObjectItem(jsonHead, "pubkey");
 			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
-			if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL)
+			if (idEntry == NULL || pkEntry == NULL || pathEntry == NULL || idEntry->type != cJSON_Number || pkEntry->type != cJSON_String || pathEntry->type != cJSON_Array)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -23, \"msg\": \"id/pubkey/path must exist\", \"data\": {}}");
@@ -240,7 +240,7 @@ void process(WFHttpTask *server_task)
 							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
 							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
-							if (pJsonPath == NULL || pJsonIsDB == NULL)
+							if (pJsonPath == NULL || pJsonIsDB == NULL || pJsonPath->type != cJSON_String || (pJsonIsDB->type != cJSON_True && pJsonIsDB->type != cJSON_False))
 							{
 								flag = false;
 								break;
@@ -294,7 +294,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "saveauths")
 		{
 			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
-			if (dataEntry == NULL)
+			if (dataEntry == NULL || dataEntry->type != cJSON_Array)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -90, \"msg\": \"data must exist\", \"data\": {}}");
@@ -313,7 +313,7 @@ void process(WFHttpTask *server_task)
 						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
 						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
 						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
-						if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL)
+						if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || procNameEntry->type != cJSON_String || keyIDEntry->type != cJSON_Number || (inheritEntry->type != cJSON_True && inheritEntry->type != cJSON_False))
 						{
 							succ = false;
 							break;
@@ -348,7 +348,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "authproc")
 		{
 			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
-			if (dataEntry == NULL)
+			if (dataEntry == NULL || dataEntry->type != cJSON_Array)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -170, \"msg\": \"data must exist\", \"data\": {}}");
@@ -367,7 +367,7 @@ void process(WFHttpTask *server_task)
 						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
 						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
 						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
-						if (procNameEntry == NULL || inheritEntry == NULL)
+						if (procNameEntry == NULL || inheritEntry == NULL || procNameEntry->type != cJSON_String || (inheritEntry->type != cJSON_True && inheritEntry->type != cJSON_False))
 						{
 							succ = false;
 							break;
@@ -379,10 +379,15 @@ void process(WFHttpTask *server_task)
 							params[i].inherit = false;
 						if (keyIDEntry == NULL)
 						{
-							params[i].ruleID = 1;
+							params[i].ruleID = 2;
 						}
 						else
 						{
+							if (keyIDEntry->type != cJSON_Number)
+							{
+								succ = false;
+								break;
+							}
 							params[i].ruleID = keyIDEntry->valueint;
 						}
 					}
@@ -410,7 +415,7 @@ void process(WFHttpTask *server_task)
 		{
 			cJSON *idEntry = cJSON_GetObjectItem(jsonHead, "id");
 			cJSON *pathEntry = cJSON_GetObjectItem(jsonHead, "path");
-			if (idEntry == NULL || pathEntry == NULL)
+			if (idEntry == NULL || pathEntry == NULL || idEntry->type != cJSON_Number || pathEntry->type != cJSON_String)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -31, \"msg\": \"id/path must exist\", \"data\": {}}");
@@ -479,7 +484,8 @@ void process(WFHttpTask *server_task)
 			cJSON *exeNameEntry = cJSON_GetObjectItem(jsonHead, "exeName");
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
-			if (daemonNameEntry == NULL || exeNameEntry == NULL || keyIDEntry == NULL || urlEntry == NULL)
+			if (daemonNameEntry == NULL || exeNameEntry == NULL || keyIDEntry == NULL || urlEntry == NULL ||
+				daemonNameEntry->type != cJSON_String || exeNameEntry->type != cJSON_String || keyIDEntry->type != cJSON_Number || urlEntry->type != cJSON_String)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -44, \"msg\": \"daemonName/exeName/keyID/url must exist\", \"data\": {}}");
@@ -554,7 +560,15 @@ void process(WFHttpTask *server_task)
 			}
 			else
 			{
-				jsonstr = PrintDaemonConfig(daemonEntry->valuestring);
+				if (daemonEntry->type != cJSON_String)
+				{
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -51, \"msg\": \"invalid daemon name\", \"data\": {}}");
+				}
+				else
+				{
+					jsonstr = PrintDaemonConfig(daemonEntry->valuestring);
+				}
 			}
 			if (jsonstr==NULL)
 			{
@@ -574,13 +588,13 @@ void process(WFHttpTask *server_task)
 		{
 			cJSON *portEntry = cJSON_GetObjectItem(jsonHead, "port");
 			int port = 0;
-			if (portEntry != NULL)
+			if (portEntry != NULL && portEntry->type == cJSON_Number)
 			{
 				port = portEntry->valueint;
 			}
 			cJSON *urlEntry = cJSON_GetObjectItem(jsonHead, "url");
 			PSTR urlStr = (PSTR)"";
-			if (urlEntry != NULL)
+			if (urlEntry != NULL && urlEntry->type == cJSON_String)
 			{
 				urlStr = urlEntry->valuestring;
 			}
@@ -654,7 +668,8 @@ void process(WFHttpTask *server_task)
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
 			cJSON *addEntry = cJSON_GetObjectItem(jsonHead, "add");
 
-			if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || addEntry == NULL)
+			if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || addEntry == NULL ||
+				procNameEntry->type != cJSON_String || keyIDEntry->type != cJSON_Number || (inheritEntry->type != cJSON_True && inheritEntry->type != cJSON_False) || (addEntry->type != cJSON_True && addEntry->type != cJSON_False))
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -72, \"msg\": \"procName/inherit/keyID/add must exist\", \"data\": {}}");
@@ -676,7 +691,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "setstate")
 		{
 			cJSON *learnEntry = cJSON_GetObjectItem(jsonHead, "state");
-			if (learnEntry == NULL)
+			if (learnEntry == NULL || learnEntry->type != cJSON_String)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -100, \"msg\": \"state parameter must exist\", \"data\": {}}");
@@ -765,7 +780,7 @@ void process(WFHttpTask *server_task)
 			if (lRet == ERROR_SUCCESS) {
 				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("LogFlag"), NULL, NULL, (LPBYTE)&logFlag, &dwSize))
 				{
-					logFlag = 1;
+					logFlag = 0;
 				}
 				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("LogOnly"), NULL, NULL, (LPBYTE)&logOnly, &dwSize))
 				{
@@ -1043,7 +1058,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "saveexeallowedpaths")
 		{
 			cJSON *dataEntry = cJSON_GetObjectItem(jsonHead, "data");
-			if (dataEntry == NULL)
+			if (dataEntry == NULL || dataEntry->type != cJSON_Array)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -160, \"msg\": \"data must exist\", \"data\": {}}");
@@ -1057,7 +1072,8 @@ void process(WFHttpTask *server_task)
 					for (int i = 0; i < dataLen; i++)
 					{
 						cJSON *pJsonDataItem = cJSON_GetArrayItem(dataEntry, i);
-						paths[i] = pJsonDataItem->valuestring;
+						if (pJsonDataItem != NULL && pJsonDataItem->type == cJSON_String)
+							paths[i] = pJsonDataItem->valuestring;
 					}
 					UpdateExeAllowedPathConfig(paths, dataLen);
 					user_resp->set_status_code("200");
@@ -1074,7 +1090,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "setabnormalthreshold")
 		{
 			cJSON *thresholdEntry = cJSON_GetObjectItem(jsonHead, "threshold");
-			if (thresholdEntry == NULL)
+			if (thresholdEntry == NULL || thresholdEntry->type != cJSON_Number)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -170, \"msg\": \"tghreshold parameter must exist\", \"data\": {}}");
@@ -1090,7 +1106,7 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "killproc")
 		{
 			cJSON *procEntry = cJSON_GetObjectItem(jsonHead, "procname");
-			if (procEntry == NULL)
+			if (procEntry == NULL || procEntry->type != cJSON_String)
 			{
 				user_resp->set_status_code("500");
 				user_resp->append_output_body("{\"code\": -180, \"msg\": \"procname parameter must exist\", \"data\": {}}");
@@ -1129,7 +1145,7 @@ void process(WFHttpTask *server_task)
 				else
 				{
 					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": 181, \"msg\": \"no process killed\", \"data\": {}}");
+					user_resp->append_output_body("{\"code\": -181, \"msg\": \"no process killed\", \"data\": {}}");
 				}
 			}
 		}

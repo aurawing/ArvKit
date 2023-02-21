@@ -513,7 +513,7 @@ NTSTATUS InitFilterConfig()
 	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable1, NULL, NULL);
 	if (!NT_SUCCESS(status) || logFlag == -1)
 	{
-		logFlag = 1;
+		logFlag = 0;
 	}
 	LogFlag = logFlag;
 
@@ -1089,7 +1089,7 @@ NTSTATUS ArvQuerySymbolicLink(
 	InitializeObjectAttributes(
 		&oa,
 		SymbolicLinkName,
-		OBJ_CASE_INSENSITIVE,
+		OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
 		0,
 		0);
 
@@ -1103,7 +1103,7 @@ NTSTATUS ArvQuerySymbolicLink(
 	LinkTarget->Length = 0;
 
 	//分配的内存需要释放
-	LinkTarget->Buffer = ExAllocatePoolWithTag(PagedPool, LinkTarget->MaximumLength, 'SOD');
+	LinkTarget->Buffer = ExAllocatePoolWithTag(NonPagedPool, LinkTarget->MaximumLength, 'SOD');
 	if (!LinkTarget->Buffer)
 	{
 		ZwClose(handle);
@@ -1598,6 +1598,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 		{
 			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
 			PUNICODE_STRING pTempStr = NULL;
+			UNICODE_STRING procStr = { 0 };
 			Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
 			if (!NT_SUCCESS(Status))
 			{
@@ -1609,7 +1610,30 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 			}
 			else
 			{
-				bufsize += pTempStr->Length;
+				UINT procNameLen = 0;
+				INT i = pTempStr->Length / sizeof(wchar_t) - 1;
+				for (; i >= 0; i--) {
+					if (pTempStr->Buffer[i] == L'\\')
+					{
+						break;
+					}
+					procNameLen += sizeof(wchar_t);
+				}
+				procStr.Buffer = &pTempStr->Buffer[(pTempStr->Length - procNameLen)/sizeof(wchar_t)];
+				if (procNameLen > 28)
+				{
+					procNameLen = 28;
+				}
+				procStr.Length = procStr.MaximumLength = procNameLen;
+				bufsize += procNameLen;
+				bufsize += 6;
+				if (pTempStr)
+				{
+					ExFreePoolWithTag(pTempStr, 'ipgD');
+					pTempStr = NULL;
+				}
+
+				/*bufsize += pTempStr->Length;
 				bufsize += 6;
 				for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++) {
 					if (pTempStr->Buffer[i] == L'\\')
@@ -1618,7 +1642,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 					}
 				}
 				ExFreePoolWithTag(pTempStr, 'ipgD');
-				pTempStr = NULL;
+				pTempStr = NULL;*/
 			}
 			pListEntry = pListEntry->Flink;
 		}
@@ -1663,6 +1687,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 		{
 			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
 			PUNICODE_STRING pTempStr = NULL;
+			UNICODE_STRING procStr = { 0 };
 			Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
 			if (!NT_SUCCESS(Status))
 			{
@@ -1675,22 +1700,55 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 			else
 			{
 				RtlAppendUnicodeToString(&String, L"\"");
-				//RtlAppendUnicodeStringToString(&String, pTempStr);
-				for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++)
-				{
-					String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
-					String.Length += sizeof(wchar_t);
-					//String.MaximumLength = String.Length;
+				UINT procNameLen = 0;
+				INT i = pTempStr->Length / sizeof(wchar_t) - 1;
+				for (; i >= 0; i--) {
 					if (pTempStr->Buffer[i] == L'\\')
 					{
-						String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
+						break;
+					}
+					procNameLen += sizeof(wchar_t);
+				}
+				procStr.Buffer = &pTempStr->Buffer[(pTempStr->Length - procNameLen)/sizeof(wchar_t)];
+				if (procNameLen > 28)
+				{
+					procNameLen = 28;
+				}
+				procStr.Length = procStr.MaximumLength = procNameLen;
+				for (UINT i = 0; i < procStr.Length / sizeof(wchar_t); i++)
+				{
+					String.Buffer[String.Length / sizeof(wchar_t)] = procStr.Buffer[i];
+					String.Length += sizeof(wchar_t);
+					if (procStr.Buffer[i] == L'\\')
+					{
+						String.Buffer[String.Length / sizeof(wchar_t)] = procStr.Buffer[i];
 						String.Length += sizeof(wchar_t);
-						//String.MaximumLength = String.Length;
 					}
 				}
 				RtlAppendUnicodeToString(&String, L"\",");
-				ExFreePoolWithTag(pTempStr, 'ipgD');
-				pTempStr = NULL;
+				if (pTempStr)
+				{
+					ExFreePoolWithTag(pTempStr, 'ipgD');
+					pTempStr = NULL;
+				}
+
+				//RtlAppendUnicodeToString(&String, L"\"");
+				////RtlAppendUnicodeStringToString(&String, pTempStr);
+				//for (UINT i = 0; i < pTempStr->Length / sizeof(wchar_t); i++)
+				//{
+				//	String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
+				//	String.Length += sizeof(wchar_t);
+				//	//String.MaximumLength = String.Length;
+				//	if (pTempStr->Buffer[i] == L'\\')
+				//	{
+				//		String.Buffer[String.Length / sizeof(wchar_t)] = pTempStr->Buffer[i];
+				//		String.Length += sizeof(wchar_t);
+				//		//String.MaximumLength = String.Length;
+				//	}
+				//}
+				//RtlAppendUnicodeToString(&String, L"\",");
+				//ExFreePoolWithTag(pTempStr, 'ipgD');
+				//pTempStr = NULL;
 			}
 			pListEntry = pListEntry->Flink;
 		}

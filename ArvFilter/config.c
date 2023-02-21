@@ -353,7 +353,7 @@ VOID ArvFreeRegProcs(PFilterConfig pFilterConfig)
 
 BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path)
 {
-	BOOL ret = TRUE;
+	BOOL ret = FALSE;
 	PLIST_ENTRY pListEntry = pFilterConfig->ExeAllowedPath.Flink;
 	while (pListEntry != &pFilterConfig->ExeAllowedPath)
 	{

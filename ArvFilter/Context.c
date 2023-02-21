@@ -50,7 +50,7 @@ Return Value:
 
 	RtlZeroMemory(streamContext, ARV_STREAM_CONTEXT_SIZE);
 
-	streamContext->FileName = ExAllocatePoolWithTag(NonPagedPool, ARV_MAX_NAME_LENGTH, CTX_STRING_TAG);
+	streamContext->FileName = ExAllocatePoolWithTag(NonPagedPool, ARV_MAX_NAME_LENGTH * sizeof(WCHAR), CTX_STRING_TAG);
 
 	if (streamContext->FileName == NULL)
 	{
@@ -58,7 +58,7 @@ Return Value:
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH);
+	RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
 
 	streamContext->Resource = CtxAllocateResource();
 	if (streamContext->Resource == NULL) {

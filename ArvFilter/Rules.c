@@ -26,7 +26,7 @@ NTSTATUS InitFilterRulesFromReg(PRuleItems *ppFilterRules)
 	//初始化 UNICODE_STRING 字符串
 	RtlInitUnicodeString(&RegUnicodeString, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\ArvCtl\\SystemFilterRules");
 	//初始化 objectAttributes
-	InitializeObjectAttributes(&objectAttributes, &RegUnicodeString, OBJ_CASE_INSENSITIVE, NULL, NULL);
+	InitializeObjectAttributes(&objectAttributes, &RegUnicodeString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
 	//打开注册表
 	status = ZwOpenKey(&hRegister, KEY_ALL_ACCESS, &objectAttributes);
 	if (!NT_SUCCESS(status))
@@ -1061,7 +1061,7 @@ NTSTATUS InitEnv(PEnvItem *ppEnvsMap)
 	//初始化 UNICODE_STRING 字符串
 	RtlInitUnicodeString(&RegUnicodeString, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\ArvCtl");
 	//初始化 objectAttributes
-	InitializeObjectAttributes(&objectAttributes, &RegUnicodeString, OBJ_CASE_INSENSITIVE, NULL, NULL);
+	InitializeObjectAttributes(&objectAttributes, &RegUnicodeString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
 	//打开注册表
 	status = ZwOpenKey(&hRegister, KEY_ALL_ACCESS, &objectAttributes);
 	if (!NT_SUCCESS(status))

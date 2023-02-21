@@ -171,16 +171,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 		DbgPrint("hit");
 	}*/
 	PARV_STREAM_CONTEXT streamContext = NULL;
-	NTSTATUS status;
+	NTSTATUS status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	BOOLEAN streamContextCreated;
 
 	if (!NT_SUCCESS(Data->IoStatus.Status)) {
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreReadCleanup;
 	}
 
 	if (FltObjects->FileObject == NULL) {
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreReadCleanup;
 	}
 
@@ -199,11 +199,19 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 		DbgPrint("[Ctx]: CtxPostRead -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
 			Data,
 			FltObjects->FileObject);
-
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreReadCleanup;
 	}
 
 	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
+	/*if (!streamContext->Read)
+	{
+		status = FLT_PREOP_COMPLETE;
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+		goto CtxPreReadCleanup;
+	}*/
 	if (streamContext->UnderDBPath)
 	{
 		InterlockedIncrement64(&filterConfig.readCountDB);
@@ -218,7 +226,7 @@ CtxPreReadCleanup:
 	if (streamContext != NULL) {
 		FltReleaseContext(streamContext);
 	}
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	return status;
 }
 
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
@@ -228,16 +236,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 )
 {
 	PARV_STREAM_CONTEXT streamContext = NULL;
-	NTSTATUS status;
+	NTSTATUS status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	BOOLEAN streamContextCreated;
 
 	if (!NT_SUCCESS(Data->IoStatus.Status)) {
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreWriteCleanup;
 	}
 
 	if (FltObjects->FileObject == NULL) {
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreWriteCleanup;
 	}
 
@@ -256,11 +264,19 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 		DbgPrint("[Ctx]: CtxPreWrite -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
 			Data,
 			FltObjects->FileObject);
-
+		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreWriteCleanup;
 	}
 
 	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
+	/*if (!streamContext->Write)
+	{
+		status = FLT_PREOP_COMPLETE;
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+		goto CtxPreWriteCleanup;
+	}*/
 	if (streamContext->UnderDBPath)
 	{
 		InterlockedIncrement64(&filterConfig.writeCountDB);
@@ -275,7 +291,7 @@ CtxPreWriteCleanup:
 	if (streamContext != NULL) {
 		FltReleaseContext(streamContext);
 	}
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	return status;
 }
 
 BOOL ArvIfMatchUnicodeString(PCUNICODE_STRING strs, PCUNICODE_STRING str, UINT len)
@@ -302,6 +318,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	NTSTATUS status2 = STATUS_SUCCESS;
 	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
+	//cbdContext->Read = cbdContext->Write = TRUE;
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
 		return status;
@@ -805,7 +822,23 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	UNICODE_STRING ExpAllow24 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
 	UNICODE_STRING ExpAllow25 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\INetCache");*/
 
-	ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+	ULONG createDisposition2 = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
+
+	ULONG createDisposition = 0;
+
+	if (((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_DATA) != 0) ||
+		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_ATTRIBUTES) != 0) ||
+		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_EA) != 0) ||
+		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_APPEND_DATA) != 0))
+	{
+		createDisposition = 0;
+	}
+	else
+	{
+		createDisposition = 1;
+	}
+
+
 	UINT ForD = 0;
 	UINT RorW = 0;
 	PProcessFlag pFlag = { 0 };
@@ -884,12 +917,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 
 
-		/*UNICODE_STRING tests = { 0 };
-		RtlInitUnicodeString(&tests, L"C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Windows\\Themes");
-		if (strcmp(callerProcessName, "explorer.exe") && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
+		UNICODE_STRING tests = { 0 };
+		RtlInitUnicodeString(&tests, L"C:\\aaa.txt");
+		if (strcmp(callerProcessName, "encrypt_decryp") == 0 && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
 		{
 			DbgPrint("hit");
-		}*/
+		}
+
+		//cbdContext->Read = cbdContext->Write = FALSE;
 
 		PRuleEntry pRuleEntry = { 0 };
 		PPathEntry pPathEntry = { 0 };
@@ -953,7 +988,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 
 		//TODO: 限制可执行文件读取
-		if (!flag && ArvIfExeAllowedPath(&filterConfig, &fullPath))
+		if (!flag && FILE_OPEN == createDisposition && ArvIfExeAllowedPath(&filterConfig, &fullPath))
 		{
 			flag = TRUE;
 		}
@@ -977,6 +1012,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				}
 				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
 			}
+			//cbdContext->Read = cbdContext->Write = TRUE;
 		}
 		else
 		{
@@ -985,6 +1021,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 			{
 				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
+				//cbdContext->Read = cbdContext->Write = TRUE;
 			}
 			else
 			{
@@ -993,16 +1030,18 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				FltIsDirectory(FltObjects->FileObject, FltObjects->Instance, &ForD);
 				ForD++;
 
-				RorW = FILE_OPEN != createDisposition;
+				RorW = FILE_OPEN != createDisposition2;
 				RorW++;
 
 				if (ArvSysPathFilterRulesIfMatch(&SystemFilterRules, procID, callerProcessName, ForD, RorW, &fullPath))
 				{
 					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					//cbdContext->Read = cbdContext->Write = TRUE;
 				}
 				else if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, ArvGetSystemRoot()->Buffer, 3 * sizeof(wchar_t)) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 				{
 					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
+					//cbdContext->Read = TRUE;
 				}
 				else
 				{
@@ -1133,6 +1172,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		if (ArvGetLogOnly())
 		{
 			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+			//cbdContext->Read = cbdContext->Write = TRUE;
 		}
 		else
 		{
@@ -1276,6 +1316,8 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	if (createContext)
 	{
 		streamContext->UnderDBPath = createContext->UnderDBPath;
+		//streamContext->Read = createContext->Read;
+		//streamContext->Write = createContext->Write;
 	}
 
 
@@ -1323,7 +1365,7 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 
 		ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
-		RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH);
+		RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
 
 		if (wcslen(FileName) < ARV_MAX_NAME_LENGTH)
 			RtlMoveMemory(streamContext->FileName, FileName, wcslen(FileName) * sizeof(WCHAR));

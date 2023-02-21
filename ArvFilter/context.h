@@ -10,7 +10,8 @@
 typedef struct _CreateContext {
 
 	BOOLEAN UnderDBPath;
-
+	//BOOLEAN Read;
+	//BOOLEAN Write;
 } CreateContext, *PCreateContext;
 
 typedef struct _ARV_VOLUME_CONTEXT {
@@ -37,6 +38,8 @@ typedef struct _ARV_STREAM_CONTEXT {
 	//  Name of the file associated with this context.
 	//
 	BOOLEAN UnderDBPath;
+	//BOOLEAN Read;
+	//BOOLEAN Write;
 
 	//
 	//  Lock used to protect this context.
