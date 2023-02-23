@@ -238,7 +238,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 	PARV_STREAM_CONTEXT streamContext = NULL;
 	NTSTATUS status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	BOOLEAN streamContextCreated;
-
+	
 	if (!NT_SUCCESS(Data->IoStatus.Status)) {
 		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreWriteCleanup;
@@ -317,6 +317,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	//
 	NTSTATUS status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	NTSTATUS status2 = STATUS_SUCCESS;
+	NTSTATUS origStatus = Data->IoStatus.Status;
 	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 	//cbdContext->Read = cbdContext->Write = TRUE;
 	if (controlProcID == 0) {
@@ -571,6 +572,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		logintag = NULL;
 		pubKey = NULL;
 		cbdContext = NULL;
+		Data->IoStatus.Status = STATUS_OBJECT_NAME_INVALID;
+		Data->IoStatus.Information = 0;
 		return FLT_PREOP_COMPLETE;
 	}
 	else if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
@@ -773,6 +776,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		logintag = NULL;
 		pubKey = NULL;
 		cbdContext = NULL;
+		Data->IoStatus.Status = STATUS_OBJECT_NAME_INVALID;
+		Data->IoStatus.Information = 0;
 		return FLT_PREOP_COMPLETE;
 	}
 
@@ -848,14 +853,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	try
 	{
 		ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
-		if (filterConfig.Rules.Flink == &filterConfig.Rules)
-		{
-			/*if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
-			{
-				status = FLT_PREOP_SYNCHRONIZE;
-			}*/
-			leave;
-		}
+		//if (filterConfig.Rules.Flink == &filterConfig.Rules)
+		//{
+		//	/*if (Data && Data->Iopb && Data->Iopb->MajorFunction == IRP_MJ_SET_INFORMATION && status != FLT_PREOP_COMPLETE)
+		//	{
+		//		status = FLT_PREOP_SYNCHRONIZE;
+		//	}*/
+		//	leave;
+		//}
 
 		status = FltGetVolumeContext(FltObjects->Filter,
 			FltObjects->Volume,
@@ -917,12 +922,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 
 
-		UNICODE_STRING tests = { 0 };
+		/*UNICODE_STRING tests = { 0 };
 		RtlInitUnicodeString(&tests, L"C:\\aaa.txt");
 		if (strcmp(callerProcessName, "encrypt_decryp") == 0 && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
 		{
 			DbgPrint("hit");
-		}
+		}*/
 
 		//cbdContext->Read = cbdContext->Write = FALSE;
 
@@ -1171,6 +1176,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	{
 		if (ArvGetLogOnly())
 		{
+			Data->IoStatus.Status = origStatus;
+			Data->IoStatus.Information = 0;
 			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 			//cbdContext->Read = cbdContext->Write = TRUE;
 		}
