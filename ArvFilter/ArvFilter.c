@@ -319,6 +319,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	NTSTATUS status2 = STATUS_SUCCESS;
 	NTSTATUS origStatus = Data->IoStatus.Status;
 	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
+	if (cbdContext == NULL)
+	{
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		return status;
+	}
 	//cbdContext->Read = cbdContext->Write = TRUE;
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
@@ -1078,7 +1083,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 			//PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
 			//cbdContext->UnderDBPath = underDBPath;
-			*CompletionContext = cbdContext;
+			//*CompletionContext = cbdContext;
 		}
 		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
 		{
@@ -1187,11 +1192,20 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			cbdContext = NULL;
 		}
 	}
+	else if (status != FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	{
+		ExFreePoolWithTag(cbdContext, 'POC');
+		cbdContext = NULL;
+	}
 	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
 	{
 		ExFreePoolWithTag(cbdContext, 'POC');
 		cbdContext = NULL;
 		status = FLT_PREOP_DISALLOW_FASTIO;
+	}
+	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && cbdContext != NULL)
+	{
+		*CompletionContext = cbdContext;
 	}
 
 	//if (status == FLT_PREOP_COMPLETE && fullPath.Length)
@@ -1445,6 +1459,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	NTSTATUS status2 = STATUS_SUCCESS;
 	PWSTR optype = L"";
 	PCreateContext cbdContext = (PCreateContext)ExAllocatePoolWithTag(NonPagedPool, sizeof(CreateContext), 'POC');
+	if (cbdContext == NULL)
+	{
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		return status;
+	}
 	if (controlProcID == 0) {
 		*CompletionContext = cbdContext;
 		return status;
@@ -1832,7 +1851,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		if (status != FLT_PREOP_COMPLETE)
 		{
 			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-			*CompletionContext = cbdContext;
 		}
 	}
 	if (status == FLT_PREOP_COMPLETE)
@@ -1857,6 +1875,10 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 		ExFreePoolWithTag(cbdContext, 'POC');
 		cbdContext = NULL;
 		status = FLT_PREOP_DISALLOW_FASTIO;
+	}
+	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	{
+		*CompletionContext = cbdContext;
 	}
 	return status;
 }
