@@ -154,6 +154,7 @@ MiniMessage(
 		OpSetFilterStatus *pOpSetFilterStatus = NULL;
 		OpSetExeAllowedPaths *pOpSetExeAllowedPaths = NULL;
 		OpSetAbnormalThreshold *pOpSetAbnormalThreshold = NULL;
+		OpSetClearLog *pOpSetClearLog = NULL;
 		OpCommand command;
 		try {
 			command = ((POpGetStat)InputBuffer)->command;
@@ -380,8 +381,15 @@ MiniMessage(
 				break;
 			case SET_ABNORMAL_THRESHOLD:
 				pOpSetAbnormalThreshold = (OpSetAbnormalThreshold*)InputBuffer;
-				ArvAbnormalCounterSetThreshold(&abnormalCounters, pOpSetAbnormalThreshold->threshold);
-				DbgPrint("[FsFilter:MiniMessage]set abnormal threshold: %d\n", pOpSetAbnormalThreshold->threshold);
+				ArvAbnormalCounterSetThreshold(&abnormalCounters, pOpSetAbnormalThreshold->threshold, pOpSetAbnormalThreshold->interval);
+				DbgPrint("[FsFilter:MiniMessage]set abnormal threshold: %d/%d\n", pOpSetAbnormalThreshold->threshold, pOpSetAbnormalThreshold->interval);
+				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
+				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
+				break;
+			case SET_CLEAR_LOG:
+				pOpSetClearLog = (OpSetClearLog*)InputBuffer;
+				ArvClearFileEx(pOpSetClearLog->type);
+				DbgPrint("[FsFilter:MiniMessage]set clear log: %d\n", pOpSetClearLog->type);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
 				break;

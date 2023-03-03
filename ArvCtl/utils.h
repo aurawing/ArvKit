@@ -19,7 +19,16 @@ typedef enum _OpCommand {  //操作命令
 	SET_EXE_ALLOWED_PATHS = 8,
 	SET_REG_PROC_TMP = 9,
 	SET_ABNORMAL_THRESHOLD = 10,
+	SET_CLEAR_LOG = 11,
 } OpCommand;
+
+typedef enum _LogType {  //操作命令
+	UNKNOWN,
+	LEARN,
+	VERIFY,
+	ENABLE,
+	ABNORMAL,
+} LogType;
 
 typedef struct _OpGetStat { //获取统计信息
 	OpCommand command;
@@ -109,7 +118,13 @@ typedef struct _OpSetExeAllowedPaths {
 typedef struct _OpSetAbnormalThreshold {
 	OpCommand command;
 	UINT threshold;
+	ULONG interval;
 } OpSetAbnormalThreshold, *POpSetAbnormalThreshold;
+
+typedef struct _OpSetClearLog {
+	OpCommand command;
+	LogType type;
+} OpSetClearLog, *POpSetClearLog;
 
 //HRESULT InitCommunicationPort(HANDLE *hPort);
 //VOID CloseCommunicationPort(HANDLE port);
@@ -123,7 +138,8 @@ HRESULT SendSetDBConfMessage(UINT ruleID, PWSTR path);
 HRESULT SendAllowUnloadMessage(BOOL allow);
 HRESULT SendSetFilterStatusMessage(DWORD logFlag, DWORD logOnly);
 HRESULT SendSetExeAllowedPathMessage(PZPWSTR paths, UINT len);
-HRESULT SendSetAbnormalThresholdMessage(UINT threshold);
+HRESULT SendSetAbnormalThresholdMessage(UINT threshold, ULONG interval);
+HRESULT SendSetClearLogMessage(LogType type);
 BOOL UTF8ToUnicode(const char* UTF8, PZPWSTR strUnicode);
 VOID FreeRegProcList(POpRegProc *pzpRegProcs, int regProcSize);
 VOID FreeRuleList(POpRule *pzpRules, int ruleSize);

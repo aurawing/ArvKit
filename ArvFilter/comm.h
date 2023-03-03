@@ -3,7 +3,7 @@
 #include <fltKernel.h>
 #include <ntdef.h>
 #include <windef.h>
-
+#include "init.h"
 #include "global.h"
 
 #define MINI_PORT_NAME L"\\ArvCommPort"
@@ -68,6 +68,7 @@ typedef enum _OP_COMMAND {  //操作命令
 	SET_EXE_ALLOWED_PATHS,
 	SET_REG_PROC_TMP,
 	SET_ABNORMAL_THRESHOLD,
+	SET_CLEAR_LOG,
 } OpCommand;
 
 typedef struct _OpGetStat { //获取统计信息
@@ -155,7 +156,13 @@ typedef struct _OpSetExeAllowedPaths {
 typedef struct _OpSetAbnormalThreshold { 
 	OpCommand command;
 	UINT threshold;
+	ULONG interval;
 } OpSetAbnormalThreshold, *POpSetAbnormalThreshold;
+
+typedef struct _OpSetClearLog {
+	OpCommand command;
+	LogType type;
+} OpSetClearLog, *POpSetClearLog;
 
 //用户态和内核态建立连接
 NTSTATUS

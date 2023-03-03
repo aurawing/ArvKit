@@ -376,11 +376,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		*CompletionContext = cbdContext;
 		return status;
 	}
-	if (ArvAbnormalCounterIfForbid(&abnormalCounters, procID))
+	/*if (ArvAbnormalCounterIfForbid(&abnormalCounters, procID))
 	{
 		*CompletionContext = cbdContext;
 		return status;
-	}
+	}*/
 	//check processname
 	PEPROCESS pCallerProcess = NULL;
 	char *callerProcessName = "";
@@ -927,12 +927,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 
 
-		/*UNICODE_STRING tests = { 0 };
-		RtlInitUnicodeString(&tests, L"C:\\aaa.txt");
-		if (strcmp(callerProcessName, "encrypt_decryp") == 0 && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
-		{
-			DbgPrint("hit");
-		}*/
+		//UNICODE_STRING tests = { 0 };
+		//RtlInitUnicodeString(&tests, L"C:\\aaa.txt");
+		//if (strcmp(callerProcessName, "encrypt_decryp") == 0)// && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
+		//{
+		//	DbgPrint("hit");
+		//}
+		//if (strcmp(callerProcessName, "vmtoolsd.exe") != 0 && strcmp(callerProcessName, "svchost.exe") != 0 && strcmp(callerProcessName, "WmiPrvSE.exe") != 0 && strcmp(callerProcessName, "MsMpEng.exe") != 0)
+		//{
+		//	DbgPrint("hit");
+		//}
 
 		//cbdContext->Read = cbdContext->Write = FALSE;
 
@@ -1071,7 +1075,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 					Data->IoStatus.Information = 0;
 					status = FLT_PREOP_COMPLETE;
-					ArvAbnormalCounterCheck(&abnormalCounters, procID, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
+					//ArvAbnormalCounterCheck(&abnormalCounters, procID, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
 				}
 			}
 		}
@@ -1128,6 +1132,53 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			}*/
 		}
 
+		if (status == FLT_PREOP_COMPLETE)
+		{
+			if (ArvGetLogOnly())
+			{
+				Data->IoStatus.Status = origStatus;
+				Data->IoStatus.Information = 0;
+				status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+				//cbdContext->Read = cbdContext->Write = TRUE;
+			}
+			else
+			{
+				ExFreePoolWithTag(cbdContext, 'POC');
+				cbdContext = NULL;
+			}
+		}
+		else if (status != FLT_PREOP_SUCCESS_WITH_CALLBACK)
+		{
+			ExFreePoolWithTag(cbdContext, 'POC');
+			cbdContext = NULL;
+		}
+		if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
+		{
+			ExFreePoolWithTag(cbdContext, 'POC');
+			cbdContext = NULL;
+			status = FLT_PREOP_DISALLOW_FASTIO;
+		}
+		if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && cbdContext != NULL)
+		{
+			*CompletionContext = cbdContext;
+		}
+		if (!ArvGetLogOnly())
+		{
+			ArvAbnormalCounterCheck(&abnormalCounters, procID, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE);
+			if (ArvAbnormalCounterIfForbid(&abnormalCounters, procID))
+			{
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				Data->IoStatus.Information = 0;
+				status = FLT_PREOP_COMPLETE;
+				if (cbdContext != NULL)
+				{
+					ExFreePoolWithTag(cbdContext, 'POC');
+					cbdContext = NULL;
+				}
+				*CompletionContext = NULL;
+			}
+		}
+
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		//ArvFreeRuleEntry2(&ruleEntry2Head);
 		if (dosName.Buffer)
@@ -1176,36 +1227,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		
 		//}
 
-	}
-	if (status == FLT_PREOP_COMPLETE)
-	{
-		if (ArvGetLogOnly())
-		{
-			Data->IoStatus.Status = origStatus;
-			Data->IoStatus.Information = 0;
-			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-			//cbdContext->Read = cbdContext->Write = TRUE;
-		}
-		else
-		{
-			ExFreePoolWithTag(cbdContext, 'POC');
-			cbdContext = NULL;
-		}
-	}
-	else if (status != FLT_PREOP_SUCCESS_WITH_CALLBACK)
-	{
-		ExFreePoolWithTag(cbdContext, 'POC');
-		cbdContext = NULL;
-	}
-	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
-	{
-		ExFreePoolWithTag(cbdContext, 'POC');
-		cbdContext = NULL;
-		status = FLT_PREOP_DISALLOW_FASTIO;
-	}
-	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && cbdContext != NULL)
-	{
-		*CompletionContext = cbdContext;
 	}
 
 	//if (status == FLT_PREOP_COMPLETE && fullPath.Length)

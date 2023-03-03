@@ -1450,6 +1450,132 @@ Cleanup:
 
 }
 
+NTSTATUS ArvClearFileEx(LogType type)
+{
+	NTSTATUS Status = STATUS_SUCCESS;
+	HANDLE LogFileHandle = { 0 };
+	PFILE_OBJECT LogFileObject = { 0 };
+	PFLT_INSTANCE LogFileInstance = { 0 };
+	UNICODE_STRING  LogVolumeName = { 0 };
+	OBJECT_ATTRIBUTES ObjectAttributes;
+	PUNICODE_STRING pLog = NULL;
+	IO_STATUS_BLOCK IoStatusBlock;
+	PFILE_RENAME_INFORMATION pFileRenameInformation = NULL;
+	ExEnterCriticalRegionAndAcquireResourceExclusive(&LogResource);
+	switch (type)
+	{
+	case LEARN:
+		pLog = &LogPath;
+		break;
+	case VERIFY:
+		pLog = &SillegalLogPath;
+		break;
+	case ENABLE:
+		pLog = &IllegalLogPath;
+		break;
+	case ABNORMAL:
+		pLog = &AbnormalLogPath;
+		break;
+	}
+	if (pLog == NULL)
+	{
+		goto CLEAN;
+	}
+	USHORT pathLen = pLog->Length;
+	pLog->Length = 12;
+	Status = ArvQuerySymbolicLink(pLog, &LogVolumeName);
+	pLog->Length = pathLen;
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+	InitializeObjectAttributes(
+		&ObjectAttributes,
+		pLog,
+		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+		NULL,
+		NULL);
+
+	LogFileInstance = XBFltGetVolumeInstance(g_minifilterHandle, &LogVolumeName);
+	if (!LogFileInstance)
+	{
+		goto CLEAN;
+	}
+	Status = FltCreateFile(
+		g_minifilterHandle,
+		LogFileInstance,
+		&LogFileHandle,
+		DELETE | SYNCHRONIZE,
+		&ObjectAttributes,
+		&IoStatusBlock,
+		NULL,
+		FILE_ATTRIBUTE_NORMAL,
+		FILE_SHARE_READ,
+		FILE_OPEN_IF,
+		FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+		NULL,
+		NULL,
+		NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+	Status = ObReferenceObjectByHandle(LogFileHandle, 0, NULL, KernelMode, &LogFileObject, NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+	pFileRenameInformation = ExAllocatePoolWithTag(NonPagedPool, sizeof(FILE_RENAME_INFORMATION) + pLog->Length + 4 * sizeof(WCHAR), 'frni');
+	RtlZeroMemory(pFileRenameInformation, sizeof(FILE_RENAME_INFORMATION) + pLog->Length + 4 * sizeof(WCHAR));
+	pFileRenameInformation->ReplaceIfExists = FALSE;
+	pFileRenameInformation->RootDirectory = NULL;
+	pFileRenameInformation->FileNameLength = pLog->Length + 4 * sizeof(WCHAR);
+	UNICODE_STRING tmpStr = { 0 };
+	tmpStr.Buffer = pFileRenameInformation->FileName;
+	tmpStr.MaximumLength = pLog->Length + 4 * sizeof(WCHAR) + 1;
+	RtlAppendUnicodeStringToString(&tmpStr, pLog);
+	RtlAppendUnicodeToString(&tmpStr, L".bak");
+	/*wcscpy_s(pFileRenameInformation->FileName, pLog->Length / sizeof(wchar_t) + 1, pLog->Buffer);
+	wcscpy_s(&pFileRenameInformation->FileName[pLog->Length / sizeof(wchar_t)], 5, L".bak");*/
+	Status = FltSetInformationFile(LogFileInstance, LogFileObject, pFileRenameInformation, sizeof(FILE_RENAME_INFORMATION), FileRenameInformation);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+
+	/*FILE_ALLOCATION_INFORMATION fileInformation;
+	fileInformation.AllocationSize.QuadPart = 0;
+	Status = FltSetInformationFile(LogFileInstance, LogFileObject, &fileInformation, sizeof(FILE_ALLOCATION_INFORMATION), FileAllocationInformation);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}*/
+CLEAN:
+	if (pFileRenameInformation)
+	{
+		ExFreePoolWithTag(pFileRenameInformation, 'frni');
+	}
+	if (LogVolumeName.Buffer)
+	{
+		ExFreePool(LogVolumeName.Buffer);
+		LogVolumeName.Buffer = NULL;
+	}
+	if (LogFileObject)
+	{
+		ObDereferenceObject(LogFileObject);
+	}
+	if (LogFileHandle)
+	{
+		FltClose(LogFileHandle);
+	}
+	if (LogFileInstance)
+	{
+		FltObjectDereference(LogFileInstance);
+	}
+	ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+	return Status;
+}
+
 NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass, BOOLEAN abnormal) {
 	HANDLE LogFileHandle = { 0 };
 	PFILE_OBJECT LogFileObject = { 0 };
@@ -1584,7 +1710,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	}
 
 	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\D:\\arv\\filter.log");
-	ULONG bufsize = 18 + path->Length + 49 + 56 + 40; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n","time":1673578456,"logtype":"abnormal"}\n
+	ULONG bufsize = 18 + path->Length + 49 + 56 + 80; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n","time":1673578456,"logtype":"abnormal"}\n
 	for (UINT i = 0; i < path->Length / sizeof(wchar_t); i++) {
 		if (path->Buffer[i] == L'\\')
 		{

@@ -561,10 +561,10 @@ VOID ArvAbnormalCounterRelease(PAbnormalCounters counters)
 	PAbnormalCounter currentCounter, tmp;
 	HASH_ITER(hh, counters->counters, currentCounter, tmp) {
 		HASH_DEL(counters->counters, currentCounter);
-		if (currentCounter->Path.Buffer)
+		/*if (currentCounter->Path.Buffer)
 		{
 			ExFreePoolWithTag(currentCounter->Path.Buffer, 'pcfg');
-		}
+		}*/
 		ExFreePoolWithTag(currentCounter, 'pcfg');
 		currentCounter = NULL;
 	}
@@ -578,6 +578,8 @@ VOID ArvAbnormalCounterAdd(PAbnormalCounters counters, UINT pid)
 	PAbnormalCounter counter = (PAbnormalCounter)ExAllocatePoolWithTag(NonPagedPool, sizeof(AbnormalCounter), 'pcfg');
 	RtlZeroMemory(counter, sizeof(AbnormalCounter));
 	counter->Pid = pid;
+	counter->Timestamp = ArvGetUnixTimestamp();
+	counter->Counter = 1;
 	HASH_ADD_INT(counters->counters, Pid, counter);
 	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
 }
@@ -590,10 +592,10 @@ VOID ArvAbnormalCounterDelete(PAbnormalCounters counters, UINT pid)
 	if (counter)
 	{
 		HASH_DEL(counters->counters, counter);
-		if (counter->Path.Buffer)
+		/*if (counter->Path.Buffer)
 		{
 			ExFreePoolWithTag(counter->Path.Buffer, 'pcfg');
-		}
+		}*/
 		ExFreePoolWithTag(counter, 'pcfg');
 		counter = NULL;
 	}
@@ -607,7 +609,37 @@ VOID ArvAbnormalCounterCheck(PAbnormalCounters counters, UINT pid, PUNICODE_STRI
 	HASH_FIND_INT(counters->counters, &pid, counter);
 	if (counter)
 	{
-		if (counter->Path.Buffer && RtlEqualUnicodeString(&counter->Path, path, TRUE))
+		if ((counter->Counter >= counters->Threshold) && (ArvGetUnixTimestamp() - counter->Timestamp < counters->Interval) && !counter->Forbid)
+		{
+			counter->Forbid = TRUE;
+		}
+		else if ((counter->Counter >= counters->Threshold) && (ArvGetUnixTimestamp() - counter->Timestamp >= counters->Interval) && !counter->Forbid)
+		{
+			counter->Timestamp = ArvGetUnixTimestamp();
+			counter->Counter = 1;
+		}
+		else if (!counter->Forbid)
+		{
+			counter->Counter++;
+		}
+		if (counter->Forbid)
+		{
+			PWSTR optype = NULL;
+			if (read)
+			{
+				optype = L"read";
+			}
+			else
+			{
+				optype = L"write";
+			}
+			ArvWriteLogEx(optype, path, pProcHead, read, isFolder, pass, TRUE);
+			InterlockedIncrement64(&filterConfig.abnormalCount);
+		}
+		
+
+
+		/*if (counter->Path.Buffer && RtlEqualUnicodeString(&counter->Path, path, TRUE))
 		{
 			counter->Counter++;
 			if (counter->Counter == counters->Threshold)
@@ -638,7 +670,7 @@ VOID ArvAbnormalCounterCheck(PAbnormalCounters counters, UINT pid, PUNICODE_STRI
 			RtlAppendUnicodeStringToString(&counter->Path, path);
 			counter->Counter = 1;
 			counter->Forbid = FALSE;
-		}
+		}*/
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
 }
@@ -661,9 +693,10 @@ BOOL ArvAbnormalCounterIfForbid(PAbnormalCounters counters, UINT pid)
 	return ret;
 }
 
-VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold)
+VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold, ULONG interval)
 {
 	ExEnterCriticalRegionAndAcquireResourceExclusive(&counters->Res);
 	counters->Threshold = threshold;
+	counters->Interval = interval;
 	ExReleaseResourceAndLeaveCriticalRegion(&counters->Res);
 }

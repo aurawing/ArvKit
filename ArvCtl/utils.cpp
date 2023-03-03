@@ -180,13 +180,25 @@ HRESULT SendSetExeAllowedPathMessage(PZPWSTR paths, UINT len)
 	return hResult;
 }
 
-HRESULT SendSetAbnormalThresholdMessage(UINT threshold)
+HRESULT SendSetAbnormalThresholdMessage(UINT threshold, ULONG interval)
 {
 	HRESULT hResult = S_OK;
 	OpSetAbnormalThreshold msg;
 	memset(&msg, 0, sizeof(OpSetAbnormalThreshold));
 	msg.command = SET_ABNORMAL_THRESHOLD;
 	msg.threshold = threshold;
+	msg.interval = interval;
+	hResult = SendToDriver(&msg.command, sizeof(msg));
+	return hResult;
+}
+
+HRESULT SendSetClearLogMessage(LogType type)
+{
+	HRESULT hResult = S_OK;
+	OpSetClearLog msg;
+	memset(&msg, 0, sizeof(OpSetClearLog));
+	msg.command = SET_CLEAR_LOG;
+	msg.type = type;
 	hResult = SendToDriver(&msg.command, sizeof(msg));
 	return hResult;
 }

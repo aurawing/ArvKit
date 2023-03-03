@@ -820,6 +820,16 @@ void process(WFHttpTask *server_task)
 		}
 		else if (ifnamestr == "loadlog")
 		{
+			bool del = false;
+			cJSON *deleteEntry = cJSON_GetObjectItem(jsonHead, "delete");
+			if (deleteEntry != NULL && (deleteEntry->type == cJSON_True || deleteEntry->type == cJSON_False))
+			{
+				del = cJSON_IsTrue(deleteEntry);
+				if (del)
+				{
+					SendSetClearLogMessage(LEARN);
+				}
+			}
 			HKEY hKey = NULL;
 			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
 			TCHAR logPath[512];
@@ -847,28 +857,51 @@ void process(WFHttpTask *server_task)
 					logPath[15] = L'o';
 					logPath[16] = L'g';
 					logPath[17] = L'\0';
+					if (del)
+					{
+						logPath[17] = L'.';
+						logPath[18] = L'b';
+						logPath[19] = L'a';
+						logPath[20] = L'k';
+						logPath[21] = L'\0';
+					}
+				}
+				else if (del)
+				{
+					logPath[logPathSize] = L'.';
+					logPath[logPathSize+1] = L'b';
+					logPath[logPathSize+2] = L'a';
+					logPath[logPathSize+3] = L'k';
+					logPath[logPathSize+4] = L'\0';
 				}
 				RegCloseKey(hKey);
 				TCHAR *logPathFull = &logPath[4];
 				//TODO: loop read file
-				FILE *fp1;
-				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
-				if (fp1 == NULL) {
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -121, \"msg\": \"open log file failed\", \"data\": {}}");
-				}
-				else
+				if (_waccess(logPathFull, 0) == 0)
 				{
-					user_resp->set_status_code("200");
-					user_resp->add_header_pair("Content-Type", "application/octet-stream");
-					void *buffer = (void *)malloc(8192);
-					while (1) {
-						int op = fread(buffer, 1, 8192, fp1);
-						if (op <= 0) break;
-						user_resp->append_output_body(buffer, op);
+					FILE *fp1;
+					errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+					if (fp1 == NULL) {
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -121, \"msg\": \"open log file failed\", \"data\": {}}");
 					}
-					free(buffer);
-					fclose(fp1);
+					else
+					{
+						user_resp->set_status_code("200");
+						user_resp->add_header_pair("Content-Type", "application/octet-stream");
+						void *buffer = (void *)malloc(8192);
+						while (1) {
+							int op = fread(buffer, 1, 8192, fp1);
+							if (op <= 0) break;
+							user_resp->append_output_body(buffer, op);
+						}
+						free(buffer);
+						fclose(fp1);
+						if (del)
+						{
+							_wremove(logPathFull);
+						}
+					}
 				}
 			}
 			else {
@@ -878,6 +911,16 @@ void process(WFHttpTask *server_task)
 		}
 		else if (ifnamestr == "illegalaccess")
 		{
+			bool del = false;
+			cJSON *deleteEntry = cJSON_GetObjectItem(jsonHead, "delete");
+			if (deleteEntry != NULL && (deleteEntry->type == cJSON_True || deleteEntry->type == cJSON_False))
+			{
+				del = cJSON_IsTrue(deleteEntry);
+				if (del)
+				{
+					SendSetClearLogMessage(ENABLE);
+				}
+			}
 			HKEY hKey = NULL;
 			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
 			TCHAR logPath[512];
@@ -906,28 +949,51 @@ void process(WFHttpTask *server_task)
 					logPath[16] = L'o';
 					logPath[17] = L'g';
 					logPath[18] = L'\0';
+					if (del)
+					{
+						logPath[18] = L'.';
+						logPath[19] = L'b';
+						logPath[20] = L'a';
+						logPath[21] = L'k';
+						logPath[22] = L'\0';
+					}
+				}
+				else if (del)
+				{
+					logPath[logPathSize] = L'.';
+					logPath[logPathSize + 1] = L'b';
+					logPath[logPathSize + 2] = L'a';
+					logPath[logPathSize + 3] = L'k';
+					logPath[logPathSize + 4] = L'\0';
 				}
 				RegCloseKey(hKey);
 				TCHAR *logPathFull = &logPath[4];
 				//TODO: loop read file
-				FILE *fp1;
-				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
-				if (fp1 == NULL) {
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -131, \"msg\": \"open log file failed\", \"data\": {}}");
-				}
-				else
+				if (_waccess(logPathFull, 0) == 0)
 				{
-					user_resp->set_status_code("200");
-					user_resp->add_header_pair("Content-Type", "application/octet-stream");
-					void *buffer = (void *)malloc(8192);
-					while (1) {
-						int op = fread(buffer, 1, 8192, fp1);
-						if (op <= 0) break;
-						user_resp->append_output_body(buffer, op);
+					FILE *fp1;
+					errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+					if (fp1 == NULL) {
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -131, \"msg\": \"open log file failed\", \"data\": {}}");
 					}
-					free(buffer);
-					fclose(fp1);
+					else
+					{
+						user_resp->set_status_code("200");
+						user_resp->add_header_pair("Content-Type", "application/octet-stream");
+						void *buffer = (void *)malloc(8192);
+						while (1) {
+							int op = fread(buffer, 1, 8192, fp1);
+							if (op <= 0) break;
+							user_resp->append_output_body(buffer, op);
+						}
+						free(buffer);
+						fclose(fp1);
+						if (del)
+						{
+							_wremove(logPathFull);
+						}
+					}
 				}
 			}
 			else {
@@ -937,6 +1003,16 @@ void process(WFHttpTask *server_task)
 		}
 		else if (ifnamestr == "sillegalaccess")
 		{
+			bool del = false;
+			cJSON *deleteEntry = cJSON_GetObjectItem(jsonHead, "delete");
+			if (deleteEntry != NULL && (deleteEntry->type == cJSON_True || deleteEntry->type == cJSON_False))
+			{
+				del = cJSON_IsTrue(deleteEntry);
+				if (del)
+				{
+					SendSetClearLogMessage(VERIFY);
+				}
+			}
 			HKEY hKey = NULL;
 			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
 			TCHAR logPath[512];
@@ -966,28 +1042,51 @@ void process(WFHttpTask *server_task)
 					logPath[17] = L'o';
 					logPath[18] = L'g';
 					logPath[19] = L'\0';
+					if (del)
+					{
+						logPath[19] = L'.';
+						logPath[20] = L'b';
+						logPath[21] = L'a';
+						logPath[22] = L'k';
+						logPath[23] = L'\0';
+					}
+				}
+				else if (del)
+				{
+					logPath[logPathSize] = L'.';
+					logPath[logPathSize + 1] = L'b';
+					logPath[logPathSize + 2] = L'a';
+					logPath[logPathSize + 3] = L'k';
+					logPath[logPathSize + 4] = L'\0';
 				}
 				RegCloseKey(hKey);
 				TCHAR *logPathFull = &logPath[4];
 				//TODO: loop read file
-				FILE *fp1;
-				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
-				if (fp1 == NULL) {
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -141, \"msg\": \"open log file failed\", \"data\": {}}");
-				}
-				else
+				if (_waccess(logPathFull, 0) == 0)
 				{
-					user_resp->set_status_code("200");
-					user_resp->add_header_pair("Content-Type", "application/octet-stream");
-					void *buffer = (void *)malloc(8192);
-					while (1) {
-						int op = fread(buffer, 1, 8192, fp1);
-						if (op <= 0) break;
-						user_resp->append_output_body(buffer, op);
+					FILE *fp1;
+					errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+					if (fp1 == NULL) {
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -141, \"msg\": \"open log file failed\", \"data\": {}}");
 					}
-					free(buffer);
-					fclose(fp1);
+					else
+					{
+						user_resp->set_status_code("200");
+						user_resp->add_header_pair("Content-Type", "application/octet-stream");
+						void *buffer = (void *)malloc(8192);
+						while (1) {
+							int op = fread(buffer, 1, 8192, fp1);
+							if (op <= 0) break;
+							user_resp->append_output_body(buffer, op);
+						}
+						free(buffer);
+						fclose(fp1);
+						if (del)
+						{
+							_wremove(logPathFull);
+						}
+					}
 				}
 			}
 			else {
@@ -997,6 +1096,16 @@ void process(WFHttpTask *server_task)
 		}
 		else if (ifnamestr == "abnormal")
 		{
+			bool del = false;
+			cJSON *deleteEntry = cJSON_GetObjectItem(jsonHead, "delete");
+			if (deleteEntry != NULL && (deleteEntry->type == cJSON_True || deleteEntry->type == cJSON_False))
+			{
+				del = cJSON_IsTrue(deleteEntry);
+				if (del)
+				{
+					SendSetClearLogMessage(ABNORMAL);
+				}
+			}
 			HKEY hKey = NULL;
 			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
 			TCHAR logPath[512];
@@ -1026,28 +1135,51 @@ void process(WFHttpTask *server_task)
 					logPath[17] = L'o';
 					logPath[18] = L'g';
 					logPath[19] = L'\0';
+					if (del)
+					{
+						logPath[19] = L'.';
+						logPath[20] = L'b';
+						logPath[21] = L'a';
+						logPath[22] = L'k';
+						logPath[23] = L'\0';
+					}
+				}
+				else if (del)
+				{
+					logPath[logPathSize] = L'.';
+					logPath[logPathSize + 1] = L'b';
+					logPath[logPathSize + 2] = L'a';
+					logPath[logPathSize + 3] = L'k';
+					logPath[logPathSize + 4] = L'\0';
 				}
 				RegCloseKey(hKey);
 				TCHAR *logPathFull = &logPath[4];
 				//TODO: loop read file
-				FILE *fp1;
-				errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
-				if (fp1 == NULL) {
-					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -151, \"msg\": \"open log file failed\", \"data\": {}}");
-				}
-				else
+				if (_waccess(logPathFull, 0) == 0)
 				{
-					user_resp->set_status_code("200");
-					user_resp->add_header_pair("Content-Type", "application/octet-stream");
-					void *buffer = (void *)malloc(8192);
-					while (1) {
-						int op = fread(buffer, 1, 8192, fp1);
-						if (op <= 0) break;
-						user_resp->append_output_body(buffer, op);
+					FILE *fp1;
+					errno_t err = _wfopen_s(&fp1, logPathFull, L"r");
+					if (fp1 == NULL) {
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -151, \"msg\": \"open log file failed\", \"data\": {}}");
 					}
-					free(buffer);
-					fclose(fp1);
+					else
+					{
+						user_resp->set_status_code("200");
+						user_resp->add_header_pair("Content-Type", "application/octet-stream");
+						void *buffer = (void *)malloc(8192);
+						while (1) {
+							int op = fread(buffer, 1, 8192, fp1);
+							if (op <= 0) break;
+							user_resp->append_output_body(buffer, op);
+						}
+						free(buffer);
+						fclose(fp1);
+						if (del)
+						{
+							_wremove(logPathFull);
+						}
+					}
 				}
 			}
 			else {
@@ -1090,15 +1222,17 @@ void process(WFHttpTask *server_task)
 		else if (ifnamestr == "setabnormalthreshold")
 		{
 			cJSON *thresholdEntry = cJSON_GetObjectItem(jsonHead, "threshold");
-			if (thresholdEntry == NULL || thresholdEntry->type != cJSON_Number)
+			cJSON *intervalEntry = cJSON_GetObjectItem(jsonHead, "interval");
+			if (thresholdEntry == NULL || thresholdEntry->type != cJSON_Number || intervalEntry == NULL || intervalEntry->type != cJSON_Number)
 			{
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -170, \"msg\": \"tghreshold parameter must exist\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -170, \"msg\": \"threshold and interval parameters must be exist\", \"data\": {}}");
 			}
 			else
 			{
 				UINT threshold = thresholdEntry->valueint;
-				SendSetAbnormalThresholdMessage(threshold);
+				ULONG interval = intervalEntry->valueint;
+				SendSetAbnormalThresholdMessage(threshold, interval);
 				user_resp->set_status_code("200");
 				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
 			}

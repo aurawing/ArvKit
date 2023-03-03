@@ -81,7 +81,8 @@ typedef struct _ParamData {
 
 typedef struct _AbnormalCounter {
 	UINT Pid;
-	UNICODE_STRING Path;
+	//UNICODE_STRING Path;
+	ULONG Timestamp;
 	ULONGLONG Counter;
 	BOOL Forbid;
 	UT_hash_handle hh;
@@ -90,6 +91,7 @@ typedef struct _AbnormalCounter {
 typedef struct _AbnormalCounters {
 	PAbnormalCounter counters;
 	UINT Threshold;
+	ULONG Interval;
 	ERESOURCE Res;
 } AbnormalCounters, *PAbnormalCounters;
 
@@ -135,4 +137,4 @@ VOID ArvAbnormalCounterAdd(PAbnormalCounters counters, UINT pid);
 VOID ArvAbnormalCounterDelete(PAbnormalCounters counters, UINT pid);
 VOID ArvAbnormalCounterCheck(PAbnormalCounters counters, UINT pid, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass);
 BOOL ArvAbnormalCounterIfForbid(PAbnormalCounters counters, UINT pid);
-VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold);
+VOID ArvAbnormalCounterSetThreshold(PAbnormalCounters counters, UINT threshold, ULONG interval);
