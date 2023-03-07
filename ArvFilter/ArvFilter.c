@@ -1819,27 +1819,70 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	}
 	finally
 	{
+		if (status != FLT_PREOP_COMPLETE)
+		{
+			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		}
 		if ((ArvGetLogFlag() & 1) && status == FLT_PREOP_COMPLETE && fullPath.Length)
 		{
-			/*if (ArvGetLogOnly())
-			{*/
-				ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, FALSE, FALSE);
-			/*}
-			else
-			{
-				ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, FALSE);
-			}*/
+			ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, FALSE, FALSE);
 		}
 		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
 		{
-			/*if (ArvGetLogOnly())
-			{*/
-				ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, TRUE, FALSE);
-			/*}
-			else
+			ArvWriteLogEx(optype, &fullPath, &procHead, FALSE, ForD - 1, TRUE, FALSE);
+		}
+
+
+		if (status == FLT_PREOP_COMPLETE)
+		{
+			if (ArvGetLogOnly())
 			{
-				ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, ForD - 1, TRUE);
-			}*/
+				Data->IoStatus.Status = 0;
+				Data->IoStatus.Information = 0;
+				status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+			}
+			else if (cbdContext != NULL)
+			{
+				ExFreePoolWithTag(cbdContext, 'POC');
+				cbdContext = NULL;
+			}
+		}
+		else if (status != FLT_PREOP_SUCCESS_WITH_CALLBACK)
+		{
+			if (cbdContext != NULL)
+			{
+				ExFreePoolWithTag(cbdContext, 'POC');
+				cbdContext = NULL;
+			}
+		}
+		if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
+		{
+			if (cbdContext != NULL)
+			{
+				ExFreePoolWithTag(cbdContext, 'POC');
+				cbdContext = NULL;
+			}
+			status = FLT_PREOP_DISALLOW_FASTIO;
+		}
+		if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && cbdContext != NULL)
+		{
+			*CompletionContext = cbdContext;
+		}
+		if (!ArvGetLogOnly())
+		{
+			ArvAbnormalCounterCheck(&abnormalCounters, procID, &fullPath, &procHead, FALSE, ForD - 1, FALSE);
+			if (ArvAbnormalCounterIfForbid(&abnormalCounters, procID))
+			{
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				Data->IoStatus.Information = 0;
+				status = FLT_PREOP_COMPLETE;
+				if (cbdContext != NULL)
+				{
+					ExFreePoolWithTag(cbdContext, 'POC');
+					cbdContext = NULL;
+				}
+				*CompletionContext = NULL;
+			}
 		}
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		//ArvFreeRuleEntry2(&ruleEntry2Head);
@@ -1874,33 +1917,53 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 		}
 	}
-	if (status == FLT_PREOP_COMPLETE)
+	if (status != FLT_PREOP_SUCCESS_WITH_CALLBACK)
 	{
-		ExFreePoolWithTag(cbdContext, 'POC');
-		cbdContext = NULL;
-		if (ArvGetLogOnly())
+		if (cbdContext != NULL)
 		{
-			status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+			ExFreePoolWithTag(cbdContext, 'POC');
+			cbdContext = NULL;
 		}
+		*CompletionContext = NULL;
 	}
-	/*if (status == FLT_PREOP_COMPLETE && fullPath.Length)
-	{
-		ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, FALSE);
-	}
-	else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && fullPath.Length)
-	{
-		ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, TRUE);
-	}*/
-	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
-	{
-		ExFreePoolWithTag(cbdContext, 'POC');
-		cbdContext = NULL;
-		status = FLT_PREOP_DISALLOW_FASTIO;
-	}
-	if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
-	{
-		*CompletionContext = cbdContext;
-	}
+	//if (status == FLT_PREOP_COMPLETE)
+	//{
+	//	if (ArvGetLogOnly())
+	//	{
+	//		status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
+	//	}
+	//	else
+	//	{
+	//		ExFreePoolWithTag(cbdContext, 'POC');
+	//		cbdContext = NULL;
+	//	}
+	//}
+	///*if (status == FLT_PREOP_COMPLETE && fullPath.Length)
+	//{
+	//	ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, FALSE);
+	//}
+	//else if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && fullPath.Length)
+	//{
+	//	ArvWriteLog(L"setinfo", &fullPath, procID, callerProcessName, FALSE, TRUE);
+	//}*/
+	//if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK && !FLT_IS_IRP_OPERATION(Data))
+	//{
+	//	ExFreePoolWithTag(cbdContext, 'POC');
+	//	cbdContext = NULL;
+	//	status = FLT_PREOP_DISALLOW_FASTIO;
+	//}
+	//if (status == FLT_PREOP_SUCCESS_WITH_CALLBACK)
+	//{
+	//	*CompletionContext = cbdContext;
+	//}
+	//else
+	//{
+	//	if (cbdContext != NULL)
+	//	{
+	//		ExFreePoolWithTag(cbdContext, 'POC');
+	//		cbdContext = NULL;
+	//	}
+	//}
 	return status;
 }
 
@@ -2186,9 +2249,12 @@ FLT_POSTOP_CALLBACK_STATUS PostOperationSetInfo(
 	if (STATUS_SUCCESS != Data->IoStatus.Status)
 	{
 		Status = FLT_POSTOP_FINISHED_PROCESSING;
+		if (CompletionContext)
+		{
+			ExFreePoolWithTag(CompletionContext, 'POC');
+		}
 		goto EXIT;
 	}
-
 
 	if (!FltDoCompletionProcessingWhenSafe(Data,
 		FltObjects,
