@@ -612,6 +612,39 @@ NTSTATUS InitFilterConfig()
 		//¿½±´×Ö·û´®
 		RtlAppendUnicodeToString(&AbnormalLogPath, L"\\??\\C:\\abnormal.log");
 	}
+
+	DWORD abnormalThreshold = -1;
+	RTL_QUERY_REGISTRY_TABLE arrayTable7[2];
+	RtlZeroMemory(arrayTable7, sizeof(arrayTable7));
+	arrayTable7[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable7[0].Name = L"AbnormalThreshold";
+	arrayTable7[0].EntryContext = &abnormalThreshold;
+	arrayTable7[0].DefaultType = REG_DWORD;
+	arrayTable7[0].DefaultData = REG_NONE;
+	arrayTable7[0].DefaultLength = REG_NONE;
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable7, NULL, NULL);
+	if (!NT_SUCCESS(status) || abnormalThreshold == -1)
+	{
+		abnormalThreshold = 0;
+	}
+
+	DWORD abnormalInterval = -1;
+	RTL_QUERY_REGISTRY_TABLE arrayTable8[2];
+	RtlZeroMemory(arrayTable8, sizeof(arrayTable8));
+	arrayTable8[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+	arrayTable8[0].Name = L"AbnormalInterval";
+	arrayTable8[0].EntryContext = &abnormalInterval;
+	arrayTable8[0].DefaultType = REG_DWORD;
+	arrayTable8[0].DefaultData = REG_NONE;
+	arrayTable8[0].DefaultLength = REG_NONE;
+	status = RtlQueryRegistryValues(RTL_REGISTRY_SERVICES, L"ArvCtl", arrayTable8, NULL, NULL);
+	if (!NT_SUCCESS(status) || abnormalInterval == -1)
+	{
+		abnormalInterval = 0;
+	}
+
+	ArvAbnormalCounterSetThreshold(&abnormalCounters, abnormalThreshold, abnormalInterval);
+
 	/*if (LogAutoClose == 1)
 	{
 		status = RtlDeleteRegistryValue(RTL_REGISTRY_SERVICES, L"ArvCtl", L"LogFlag");

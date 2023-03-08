@@ -81,7 +81,7 @@ void process(WFHttpTask *server_task)
 				cJSON *root = cJSON_CreateObject();
 				cJSON *item = cJSON_CreateObject();
 				cJSON_AddItemToObject(root, "code", cJSON_CreateNumber(0));
-				cJSON_AddItemToObject(root, "message", cJSON_CreateString("success"));
+				cJSON_AddItemToObject(root, "msg", cJSON_CreateString("success"));
 				cJSON_AddItemToObject(root, "data", item);
 				cJSON_AddItemToObject(item, "secretnumber", cJSON_CreateNumber(kernelStat.KeyCount));
 				cJSON_AddItemToObject(item, "filesize", cJSON_CreateNumber(diskInfo.totalBytes - diskInfo.totalFreeBytes));
@@ -1232,9 +1232,74 @@ void process(WFHttpTask *server_task)
 			{
 				UINT threshold = thresholdEntry->valueint;
 				ULONG interval = intervalEntry->valueint;
-				SendSetAbnormalThresholdMessage(threshold, interval);
+
+				HKEY hKey = NULL;
+				TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+				LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+				if (lRet == ERROR_SUCCESS) {
+					RegDeleteValue(hKey, _T("AbnormalThreshold"));
+					if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("AbnormalThreshold"), 0, REG_DWORD, (CONST BYTE*)&threshold, sizeof(DWORD)))
+					{
+						user_resp->set_status_code("500");
+						user_resp->append_output_body("{\"code\": -172, \"msg\": \"save registry of abnormal threshold failed\", \"data\": {}}");
+					}
+					else
+					{
+						RegDeleteValue(hKey, _T("AbnormalInterval"));
+						if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("AbnormalInterval"), 0, REG_DWORD, (CONST BYTE*)&interval, sizeof(DWORD)))
+						{
+							user_resp->set_status_code("500");
+							user_resp->append_output_body("{\"code\": -173, \"msg\": \"save registry of abnormal interval failed\", \"data\": {}}");
+						}
+						else
+						{
+							SendSetAbnormalThresholdMessage(threshold, interval);
+							user_resp->set_status_code("200");
+							user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+						}
+					}
+					RegCloseKey(hKey);
+				}
+				else {
+					user_resp->set_status_code("500");
+					user_resp->append_output_body("{\"code\": -171, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+				}
+			}
+		}
+		else if (ifnamestr == "getabnormalthreshold")
+		{
+			DWORD threshold = -1;
+			DWORD interval = -1;
+			HKEY hKey = NULL;
+			TCHAR *lpszSubKey = (TCHAR*)_T("SYSTEM\\CurrentControlSet\\Services\\ArvCtl");
+			DWORD dwSize = sizeof(DWORD);
+			LONG lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, lpszSubKey, 0, KEY_ALL_ACCESS, &hKey);
+			if (lRet == ERROR_SUCCESS) {
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("AbnormalThreshold"), NULL, NULL, (LPBYTE)&threshold, &dwSize))
+				{
+					threshold = 0;
+				}
+				if (ERROR_SUCCESS != ::RegQueryValueEx(hKey, _T("AbnormalInterval"), NULL, NULL, (LPBYTE)&interval, &dwSize))
+				{
+					interval = 0;
+				}
+				RegCloseKey(hKey);
+
+				cJSON *root = cJSON_CreateObject();
+				cJSON *item = cJSON_CreateObject();
+				cJSON_AddItemToObject(root, "code", cJSON_CreateNumber(0));
+				cJSON_AddItemToObject(root, "msg", cJSON_CreateString("success"));
+				cJSON_AddItemToObject(root, "data", item);
+				cJSON_AddItemToObject(item, "threshold", cJSON_CreateNumber(threshold));
+				cJSON_AddItemToObject(item, "interval", cJSON_CreateNumber(interval));
+				char* jsonstr = cJSON_Print(root);
+				user_resp->append_output_body(jsonstr);
 				user_resp->set_status_code("200");
-				user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
+				cJSON_Delete(root);
+			}
+			else {
+				user_resp->set_status_code("500");
+				user_resp->append_output_body("{\"code\": -190, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
 			}
 		}
 		else if (ifnamestr == "killproc")
