@@ -200,7 +200,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 			Data,
 			FltObjects->FileObject);
 		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
-		goto CtxPreReadCleanup;
+		goto CtxPreReadCleanup1;
 	}
 
 	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
@@ -217,6 +217,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 		InterlockedIncrement64(&filterConfig.readCountDB);
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+
+CtxPreReadCleanup1:
 
 	ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 	InterlockedIncrement64(&filterConfig.readCount);
@@ -265,7 +267,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 			Data,
 			FltObjects->FileObject);
 		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
-		goto CtxPreWriteCleanup;
+		goto CtxPreWriteCleanup1;
 	}
 
 	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
@@ -282,6 +284,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 		InterlockedIncrement64(&filterConfig.writeCountDB);
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+
+CtxPreWriteCleanup1:
 
 	ExEnterCriticalRegionAndAcquireResourceShared(&HashResource);
 	InterlockedIncrement64(&filterConfig.writeCount);
@@ -831,7 +835,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	UNICODE_STRING ExpAllow23 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\WebCacheLock.dat");
 	UNICODE_STRING ExpAllow24 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Caches");
 	UNICODE_STRING ExpAllow25 = RTL_CONSTANT_STRING(L"C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\INetCache");*/
-
+	
 	ULONG createDisposition2 = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
 
 	ULONG createDisposition = 0;
@@ -1103,12 +1107,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				optype = L"write";
 			}
 				ArvWriteLogEx(optype, &fullPath, &procHead, FILE_OPEN == createDisposition, ForD - 1, FALSE, FALSE);
-			/*}
+				/*}
 			else
 			{
 				ArvWriteLog(L"create", &fullPath, procID, callerProcessName, FILE_OPEN == createDisposition, ForD - 1, FALSE);
 			}*/
-			
+
 			//status = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 		}
 		else if ((ArvGetLogFlag() & 2) && status == FLT_PREOP_SUCCESS_WITH_CALLBACK && FLT_IS_IRP_OPERATION(Data) && fullPath.Length)
@@ -1224,7 +1228,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//}
 		//else
 		//{
-		
+
 		//}
 
 	}
@@ -1267,7 +1271,6 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 )
 {
 
-
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(Flags);
 	UNREFERENCED_PARAMETER(CbdContext);
@@ -1295,126 +1298,130 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 		opStatus = FLT_POSTOP_FINISHED_PROCESSING;
 		goto CtxPostCreateCleanup;
 	}
-
-	//PAGED_CODE();
-
-	DbgPrint("[Ctx]: CtxPostCreate -> Enter (Cbd = %p, FileObject = %p)\n",
-		Cbd,
-		FltObjects->FileObject);
-
-	//
-	// Initialize defaults
-	//
-
-	status = STATUS_SUCCESS;
-
-	//
-	//  If the Create has failed, do nothing
-	//
-
-	//if (!NT_SUCCESS(Cbd->IoStatus.Status)) {
-	//	goto CtxPostCreateCleanup;
-	//}
-
-	//
-	// Find or create a stream context
-	//
-
-	status = CtxFindOrCreateStreamContext(Cbd,
-		TRUE,
-		&streamContext,
-		&streamContextCreated);
-	if (!NT_SUCCESS(status)) {
-
-		//
-		//  This failure will most likely be because stream contexts are not supported
-		//  on the object we are trying to assign a context to or the object is being 
-		//  deleted
-		//  
-
-		DbgPrint("[Ctx]: CtxPostCreate -> Failed to find or create stream context (Cbd = %p, FileObject = %p)\n",
-			Cbd,
-			FltObjects->FileObject);
-		opStatus = FLT_POSTOP_FINISHED_PROCESSING;
+	/*if (KeGetCurrentIrql() >= 2)
+	{
 		goto CtxPostCreateCleanup;
 	}
 
-	/*DbgPrint("[Ctx]: CtxPostCreate -> Getting/Creating stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
-		&nameInfo->Name,
-		Cbd,
-		FltObjects->FileObject,
-		streamContext,
-		streamContextCreated);*/
+	PAGED_CODE();*/
 
-		//
-		//  Acquire write acccess to the context
-		//
+	//DbgPrint("[Ctx]: CtxPostCreate -> Enter (Cbd = %p, FileObject = %p)\n",
+	//	Cbd,
+	//	FltObjects->FileObject);
 
-	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+	////
+	//// Initialize defaults
+	////
 
-	//
-	//  Increment the create count
-	//
-	if (createContext)
-	{
-		streamContext->UnderDBPath = createContext->UnderDBPath;
-		//streamContext->Read = createContext->Read;
-		//streamContext->Write = createContext->Write;
-	}
+	//status = STATUS_SUCCESS;
 
+	////
+	////  If the Create has failed, do nothing
+	////
 
-	/*DbgPrint("[Ctx]: CtxPostCreate -> Stream context info for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
-		&nameInfo->Name,
-		Cbd,
-		FltObjects->FileObject,
-		streamContext);*/
+	////if (!NT_SUCCESS(Cbd->IoStatus.Status)) {
+	////	goto CtxPostCreateCleanup;
+	////}
 
-		//
-		//  Relinquish write acccess to the context
-		//
+	////
+	//// Find or create a stream context
+	////
 
-	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
-
-	//
-	//  Quit on failure after we have given up
-	//  the resource
-	//
-
+	//status = CtxFindOrCreateStreamContext(Cbd,
+	//	TRUE,
+	//	&streamContext,
+	//	&streamContextCreated);
 	//if (!NT_SUCCESS(status)) {
 
-	//	/*DbgPrint("[Ctx]: CtxPostCreate -> Failed to update name in stream context for file %wZ (Cbd = %p, FileObject = %p)\n",
-	//		&nameInfo->Name,
-	//		Cbd,
-	//		FltObjects->FileObject);*/
+	//	//
+	//	//  This failure will most likely be because stream contexts are not supported
+	//	//  on the object we are trying to assign a context to or the object is being 
+	//	//  deleted
+	//	//  
 
+	//	DbgPrint("[Ctx]: CtxPostCreate -> Failed to find or create stream context (Cbd = %p, FileObject = %p)\n",
+	//		Cbd,
+	//		FltObjects->FileObject);
+	//	opStatus = FLT_POSTOP_FINISHED_PROCESSING;
 	//	goto CtxPostCreateCleanup;
 	//}
 
-	if (streamContextCreated || 0 == wcslen(streamContext->FileName))
-	{
-		status = ArvGetFileNameOrExtension(Cbd, NULL, FileName);
+	///*DbgPrint("[Ctx]: CtxPostCreate -> Getting/Creating stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
+	//	&nameInfo->Name,
+	//	Cbd,
+	//	FltObjects->FileObject,
+	//	streamContext,
+	//	streamContextCreated);*/
 
-		if (STATUS_SUCCESS != status)
-		{
-			ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ArvGetFileNameOrExtension failed. Status = 0x%x.\n", __FUNCTION__, status));
-			goto CtxPostCreateCleanup;
-		}
+	//	//
+	//	//  Acquire write acccess to the context
+	//	//
 
-		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ContextCreated Fcb = %p FileName = %ws.\n", __FUNCTION__,
-			FltObjects->FileObject->FsContext,
-			FileName));
+	//ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+
+	////
+	////  Increment the create count
+	////
+	//if (createContext)
+	//{
+	//	streamContext->UnderDBPath = createContext->UnderDBPath;
+	//	//streamContext->Read = createContext->Read;
+	//	//streamContext->Write = createContext->Write;
+	//}
 
 
-		ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+	///*DbgPrint("[Ctx]: CtxPostCreate -> Stream context info for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
+	//	&nameInfo->Name,
+	//	Cbd,
+	//	FltObjects->FileObject,
+	//	streamContext);*/
 
-		RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
+	//	//
+	//	//  Relinquish write acccess to the context
+	//	//
 
-		if (wcslen(FileName) < ARV_MAX_NAME_LENGTH)
-			RtlMoveMemory(streamContext->FileName, FileName, wcslen(FileName) * sizeof(WCHAR));
+	//ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
-		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	////
+	////  Quit on failure after we have given up
+	////  the resource
+	////
 
-	}
+	////if (!NT_SUCCESS(status)) {
+
+	////	/*DbgPrint("[Ctx]: CtxPostCreate -> Failed to update name in stream context for file %wZ (Cbd = %p, FileObject = %p)\n",
+	////		&nameInfo->Name,
+	////		Cbd,
+	////		FltObjects->FileObject);*/
+
+	////	goto CtxPostCreateCleanup;
+	////}
+
+	//if (streamContextCreated || 0 == wcslen(streamContext->FileName))
+	//{
+	//	status = ArvGetFileNameOrExtension(Cbd, NULL, FileName);
+
+	//	if (STATUS_SUCCESS != status)
+	//	{
+	//		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ArvGetFileNameOrExtension failed. Status = 0x%x.\n", __FUNCTION__, status));
+	//		goto CtxPostCreateCleanup;
+	//	}
+
+	//	ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ContextCreated Fcb = %p FileName = %ws.\n", __FUNCTION__,
+	//		FltObjects->FileObject->FsContext,
+	//		FileName));
+
+
+	//	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+
+	//	RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
+
+	//	if (wcslen(FileName) < ARV_MAX_NAME_LENGTH)
+	//		RtlMoveMemory(streamContext->FileName, FileName, wcslen(FileName) * sizeof(WCHAR));
+
+	//	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+
+	// }
 
 	/*if (FlagOn(Cbd->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_READ_DATA))
 	{
@@ -1466,6 +1473,62 @@ CtxPostCreateCleanup:
 
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
+
+FLT_POSTOP_CALLBACK_STATUS PostOperationCreate2(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_opt_ PVOID CompletionContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+)
+{
+	UNREFERENCED_PARAMETER(Data);
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CompletionContext);
+	UNREFERENCED_PARAMETER(Flags);
+
+	FLT_POSTOP_CALLBACK_STATUS Status = FLT_POSTOP_FINISHED_PROCESSING;
+
+	if (FlagOn(Flags, FLTFL_POST_OPERATION_DRAINING))
+	{
+		if (CompletionContext)
+		{
+			ExFreePoolWithTag(CompletionContext, 'POC');
+		}
+		goto EXIT;
+	}
+
+	/*
+	* 如果FO创建失败，不进入PocFindOrCreateStreamContext
+	*/
+	if (STATUS_SUCCESS != Data->IoStatus.Status)
+	{
+		Status = FLT_POSTOP_FINISHED_PROCESSING;
+		if (CompletionContext)
+		{
+			ExFreePoolWithTag(CompletionContext, 'POC');
+		}
+		goto EXIT;
+	}
+
+	if (!FltDoCompletionProcessingWhenSafe(Data,
+		FltObjects,
+		CompletionContext,
+		Flags,
+		PostOperationCreate,
+		&Status))
+	{
+		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES,
+			("%s->FltDoCompletionProcessingWhenSafe failed. Status = 0x%x.\n",
+				__FUNCTION__,
+				Status));
+	}
+
+EXIT:
+
+	return Status;
+}
+
+
 
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	_Inout_ PFLT_CALLBACK_DATA Data,
