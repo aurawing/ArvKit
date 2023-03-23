@@ -1279,10 +1279,6 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 
 	PCreateContext createContext = CbdContext;
 	PARV_STREAM_CONTEXT streamContext = NULL;
-	//PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
-	//UNICODE_STRING fullPath = { 0 };
-	//UNICODE_STRING dosName = { 0 };
-	//size_t fullLen = 0;
 
 	NTSTATUS status;
 	BOOLEAN streamContextCreated;
@@ -1298,30 +1294,23 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 		opStatus = FLT_POSTOP_FINISHED_PROCESSING;
 		goto CtxPostCreateCleanup;
 	}
-	/*if (KeGetCurrentIrql() >= 2)
+	if (KeGetCurrentIrql() >= 2)
 	{
 		goto CtxPostCreateCleanup;
 	}
 
-	PAGED_CODE();*/
+	PAGED_CODE();
 
-	//DbgPrint("[Ctx]: CtxPostCreate -> Enter (Cbd = %p, FileObject = %p)\n",
-	//	Cbd,
-	//	FltObjects->FileObject);
+	DbgPrint("[Ctx]: CtxPostCreate -> Enter (Cbd = %p, FileObject = %p)\n",
+		Cbd,
+		FltObjects->FileObject);
 
-	////
-	//// Initialize defaults
-	////
+	//
+	// Initialize defaults
+	//
 
 	//status = STATUS_SUCCESS;
 
-	////
-	////  If the Create has failed, do nothing
-	////
-
-	////if (!NT_SUCCESS(Cbd->IoStatus.Status)) {
-	////	goto CtxPostCreateCleanup;
-	////}
 
 	////
 	//// Find or create a stream context
@@ -1365,37 +1354,9 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	//if (createContext)
 	//{
 	//	streamContext->UnderDBPath = createContext->UnderDBPath;
-	//	//streamContext->Read = createContext->Read;
-	//	//streamContext->Write = createContext->Write;
 	//}
 
-
-	///*DbgPrint("[Ctx]: CtxPostCreate -> Stream context info for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p)\n",
-	//	&nameInfo->Name,
-	//	Cbd,
-	//	FltObjects->FileObject,
-	//	streamContext);*/
-
-	//	//
-	//	//  Relinquish write acccess to the context
-	//	//
-
 	//ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
-
-	////
-	////  Quit on failure after we have given up
-	////  the resource
-	////
-
-	////if (!NT_SUCCESS(status)) {
-
-	////	/*DbgPrint("[Ctx]: CtxPostCreate -> Failed to update name in stream context for file %wZ (Cbd = %p, FileObject = %p)\n",
-	////		&nameInfo->Name,
-	////		Cbd,
-	////		FltObjects->FileObject);*/
-
-	////	goto CtxPostCreateCleanup;
-	////}
 
 	//if (streamContextCreated || 0 == wcslen(streamContext->FileName))
 	//{
@@ -1423,22 +1384,6 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 
 	// }
 
-	/*if (FlagOn(Cbd->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_READ_DATA))
-	{
-		status = ArvFlushOriginalCache(
-			FltObjects->Instance,
-			streamContext->FileName);
-
-		if (STATUS_SUCCESS != status)
-		{
-			DbgPrint("flush file success");
-		}
-		else
-		{
-			DbgPrint("flush file failed");
-		}
-	}*/
-
 
 CtxPostCreateCleanup:
 
@@ -1447,18 +1392,10 @@ CtxPostCreateCleanup:
 	// Release the references we have acquired
 	//    
 
-	/*if (nameInfo != NULL) {
-
-		FltReleaseFileNameInformation(nameInfo);
-	}*/
-
 	if (streamContext != NULL) {
 
 		FltReleaseContext(streamContext);
 	}
-
-	//ArvFreeUnicodeString(&dosName, 'SOD');
-	//ArvFreeUnicodeString(&fullPath, 'POC');
 
 	if (createContext)
 	{
