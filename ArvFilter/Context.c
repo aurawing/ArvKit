@@ -115,9 +115,9 @@ Return Value:
 	//  First try to get the stream context.
 	//
 
-	DbgPrint("[Ctx]: Trying to get stream context (FileObject = %p, Instance = %p)\n",
+	DbgPrint("------------- [Ctx]: Trying to get stream context (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
 		Cbd->Iopb->TargetFileObject,
-		Cbd->Iopb->TargetInstance);
+		Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
 
 	status = FltGetStreamContext(Cbd->Iopb->TargetInstance,
 		Cbd->Iopb->TargetFileObject,
@@ -138,9 +138,9 @@ Return Value:
 		//  Create a stream context
 		//
 
-		DbgPrint("[Ctx]: Creating stream context (FileObject = %p, Instance = %p)\n",
+		DbgPrint("------------- [Ctx]: Creating stream context (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
 			Cbd->Iopb->TargetFileObject,
-			Cbd->Iopb->TargetInstance);
+			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
 
 		status = CtxCreateStreamContext(&streamContext);
 
@@ -159,16 +159,21 @@ Return Value:
 		//  Set the new context we just allocated on the file object
 		//
 
-		DbgPrint("[Ctx]: Setting stream context %p (FileObject = %p, Instance = %p)\n",
+		DbgPrint("------------- [Ctx]: Setting stream context %p (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
 			streamContext,
 			Cbd->Iopb->TargetFileObject,
-			Cbd->Iopb->TargetInstance);
+			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
 
 		status = FltSetStreamContext(Cbd->Iopb->TargetInstance,
 			Cbd->Iopb->TargetFileObject,
 			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
 			streamContext,
 			&oldStreamContext);
+
+		DbgPrint("------------- [Ctx]: After setting stream context %p (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
+			streamContext,
+			Cbd->Iopb->TargetFileObject,
+			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
 
 		if (!NT_SUCCESS(status)) {
 

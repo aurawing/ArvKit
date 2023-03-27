@@ -1711,7 +1711,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 		&IoStatusBlock,
 		NULL,
 		FILE_ATTRIBUTE_NORMAL,
-		FILE_SHARE_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
 		FILE_OPEN_IF,
 		FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
 		NULL,
@@ -1722,6 +1722,13 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 		DbgPrint("Open source file fault !! - %#x\n", Status);
 		goto CLEAN;
 	}
+
+
+	if (LogFlag == 1 && LogOnly == 2 && IoStatusBlock.Status == STATUS_SUCCESS && IoStatusBlock.Information == FILE_CREATED)
+	{
+		ArvWriteSystemProcess();
+	}
+
 	/*if (LogFileObject)
 	{
 		Status = FltGetVolumeFromFileObject(g_minifilterHandle, LogFileObject, &LogVolume);
@@ -1998,5 +2005,133 @@ CLEAN:
 		FltObjectDereference(LogVolume);
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+	return Status;
+}
+
+
+
+NTSTATUS ArvWriteSystemProcess() {
+
+	HANDLE LogFileHandle = { 0 };
+	PFILE_OBJECT LogFileObject = { 0 };
+	PFLT_INSTANCE LogFileInstance = { 0 };
+	PFLT_VOLUME LogVolume = { 0 };
+	NTSTATUS Status = STATUS_SUCCESS;
+	OBJECT_ATTRIBUTES ObjectAttributes;
+	UNICODE_STRING  LogVolumeName = { 0 };
+	UNICODE_STRING logType = { 0 };
+	WCHAR logTypeBuf[10];
+	IO_STATUS_BLOCK IoStatusBlock;
+
+	RtlInitEmptyUnicodeString(&logType, logTypeBuf, 10 * sizeof(WCHAR));
+
+	/*ExEnterCriticalRegionAndAcquireResourceExclusive(&LogResource);
+	if (!bReady)
+	{
+		goto CLEAN;
+	}*/
+	PUNICODE_STRING pLog = &LogPath;
+
+	USHORT pathLen = pLog->Length;
+	pLog->Length = 12;
+	Status = ArvQuerySymbolicLink(pLog, &LogVolumeName);
+	pLog->Length = pathLen;
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+
+	InitializeObjectAttributes(
+		&ObjectAttributes,
+		pLog,
+		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+		NULL,
+		NULL);
+
+	LogFileInstance = XBFltGetVolumeInstance(g_minifilterHandle, &LogVolumeName);
+	if (!LogFileInstance)
+	{
+		goto CLEAN;
+	}
+	//以FILE_OVERWRITE_IF方式打开
+	Status = FltCreateFile(
+		g_minifilterHandle,
+		LogFileInstance,
+		&LogFileHandle,
+		//&LogFileObject,
+		FILE_APPEND_DATA | SYNCHRONIZE,
+		&ObjectAttributes,
+		&IoStatusBlock,
+		NULL,
+		FILE_ATTRIBUTE_NORMAL,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		FILE_OPEN_IF,
+		FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+		NULL,
+		NULL,
+		NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		DbgPrint("Open source file fault !! - %#x\n", Status);
+		goto CLEAN;
+	}
+
+	Status = ObReferenceObjectByHandle(LogFileHandle, 0, NULL, KernelMode, &LogFileObject, NULL);
+
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+
+	UNICODE_STRING procnames = RTL_CONSTANT_STRING(L"SystemProcessStart:\r\nSystemProcess:N:SystemP:0,N:smss.exeP:0,N:csrss.exeP:0,N:wininit.exeP:0,N:services.exeP:0,N:svchost.exeP:0,N:WmiPrvSE.exeP:0,N:RuntimeBroker.exeP:0,N:ChsIME.exeP:0,N:ShellExperienceHost.exeP:0,N:SearchUI.exeP:0,N:WUDFHost.exeP:0,N:sihost.exeP:0,N:taskhostw.exeP:0,N:spoolsv.exeP:0,N:MsMpEng.exeP:0,N:wlms.exeP:0,N:dllhost.exeP:0,N:NisSrv.exeP:0,N:SearchIndexer.exeP:0,N:fontdrvhost.exeP:0,N:lsass.exeP:0,N:winlogon.exeP:0,N:dwm.exeP:0,N:explorer.exeP:0,N:cmd.exeP:0,N:sc.exeP:0,N:LogonUI.exeP:0,N:WMIADAP.exeP:0,N:WdkCommSvc.exeP:0,N:conhost.exeP:0,N:msdtc.exeP:0,N:netsh.exeP:0,N:sppsvc.exeP:0,N:WerFault.exeP:0,N:wermgr.exeP:0,N:wevtutil.exeP:0,N:CompatTelRunner.exeP:0,N:ServerManagerLancher.exeP:0,N:ServerManager.exeP:0,N:WMIC.exeP:0,N:reg.exeP:0,N:userinit.exeP:0,N:mobsync.exeP:0,N:SearchProtocolHost.exeP:0,N:VSSVC.exeP:0,N:WmiApSrv.exeP:0,N:ApplicationFrameHost.exeP:0,N:SearchFilterHost.exeP:0,N:SystemSettings.exeP:0,N:rundll32.exeP:0,N:VGAuthService.exeP:0,N:UsoClient.exeP:0,N:fltMC.exeP:0,N:MpCmdRun.exeP:0,N:OpenWith.exeP:0,N:control.exeP:0,N:msconfig.exeP:0,N:MusNotification.exeP:0,N:TiWorker.exeP:0,N:TrustedInstall.exeP:0,N:InstallAgent.exeP:0,N:taskmgr.exeP:0,N:mmc.exeP:0,N:smartscreen.exeP:0,N:wuauclt.exeP:0,N:MSASCui.exeP:0,N:MSASCuiL.exeP:0,N:SIHClient.exeP:0,N:wsqmcons.exeP:0,N:makecab.exeP:0,N:ngentask.exeP:0,N:vmtoolsd.exeP:0,N:vm3dservice.exeP:0,\r\nSystemProcessEnd:\r\n");
+	FILE_STANDARD_INFORMATION fileInfo = { 0 };
+	Status = FltQueryInformationFile(LogFileInstance, LogFileObject, &fileInfo, sizeof(fileInfo), FileStandardInformation, NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		goto CLEAN;
+	}
+
+	//写入文件
+	Status = FltWriteFile(
+		LogFileInstance,
+		LogFileObject,
+		&fileInfo.EndOfFile,
+		procnames.Length,
+		procnames.Buffer,
+		NULL,
+		NULL,
+		NULL,
+		NULL);
+	if (!NT_SUCCESS(Status))
+	{
+		DbgPrint("写入源文件失败!!\n - %#X", Status);
+	}
+	else
+	{
+		Offset.QuadPart += procnames.Length;
+	}
+CLEAN:
+	if (LogVolumeName.Buffer)
+	{
+		ExFreePool(LogVolumeName.Buffer);
+		LogVolumeName.Buffer = NULL;
+	}
+	if (LogFileObject)
+	{
+		ObDereferenceObject(LogFileObject);
+	}
+	if (LogFileHandle)
+	{
+		FltClose(LogFileHandle);
+	}
+	if (LogFileInstance)
+	{
+		FltObjectDereference(LogFileInstance);
+	}
+	if (LogVolume)
+	{
+		FltObjectDereference(LogVolume);
+	}
+	//ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
 	return Status;
 }

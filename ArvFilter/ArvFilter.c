@@ -880,10 +880,14 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			leave;
 		}
 
-		status2 = PsLookupProcessByProcessId((HANDLE)procID, &pCallerProcess);
-		if (status2 == STATUS_SUCCESS)
+		status = PsLookupProcessByProcessId((HANDLE)procID, &pCallerProcess);
+		if (NT_SUCCESS(status))
 		{
 			callerProcessName = PsGetProcessImageFileName(pCallerProcess);
+		}
+		else
+		{
+			leave;
 		}
 		UNICODE_STRING netVolName;
 		RtlInitUnicodeString(&netVolName, L"\\Device\\Mup");
@@ -1294,10 +1298,10 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 		opStatus = FLT_POSTOP_FINISHED_PROCESSING;
 		goto CtxPostCreateCleanup;
 	}
-	if (KeGetCurrentIrql() >= 2)
+	/*if (KeGetCurrentIrql() >= 2)
 	{
 		goto CtxPostCreateCleanup;
-	}
+	}*/
 
 	PAGED_CODE();
 
