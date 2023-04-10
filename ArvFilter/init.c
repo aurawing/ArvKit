@@ -1750,19 +1750,26 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	}
 
 	//UNICODE_STRING LogFilePath = RTL_CONSTANT_STRING(L"\\??\\D:\\arv\\filter.log");
-	ULONG bufsize = 18 + path->Length + 49 + 56 + 80; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n","time":1673578456,"logtype":"abnormal"}\n
+	ULONG bufsize = 18 + path->Length + 49 + 56 + 80 + 15; //{"path":"xxx","type":"r","procs":["aaa","bbb","ccc"],"folder":"y","pass":"n","time":1673578456,"logtype":"abnormal"}\n
 	for (UINT i = 0; i < path->Length / sizeof(wchar_t); i++) {
 		if (path->Buffer[i] == L'\\')
 		{
 			bufsize += sizeof(wchar_t);
 		}
 	}
+	UINT32 procID = 0;
+	int i = 0;
 	if (pProcHead)
 	{
 		PLIST_ENTRY pListEntry = pProcHead->Flink;
 		while (pListEntry != pProcHead)
 		{
+			i++;
 			PProcEntry pProcEntry = CONTAINING_RECORD(pListEntry, ProcEntry, entry);
+			if (i == 1)
+			{
+				procID = pProcEntry->ProcID;
+			}
 			PUNICODE_STRING pTempStr = NULL;
 			UNICODE_STRING procStr = { 0 };
 			Status = GetProcessImageName(pProcEntry->ProcID, &pTempStr);
@@ -1944,7 +1951,15 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	RtlAppendUnicodeStringToString(&String, &timestamp);
 	RtlAppendUnicodeToString(&String, L",\"C\":\"");
 	RtlAppendUnicodeStringToString(&String, &logType);
-	RtlAppendUnicodeToString(&String, L"\"}\r\n");
+
+	char intbuf[20];
+	UNICODE_STRING procIDStr;
+	RtlInitEmptyUnicodeString(&procIDStr, intbuf, 20);
+	RtlIntegerToUnicodeString(procID, 10, &procIDStr);
+	RtlAppendUnicodeToString(&String, L",\"F\":");
+	RtlAppendUnicodeStringToString(&String, &procIDStr);
+
+	RtlAppendUnicodeToString(&String, L"}\r\n");
 
 	/*if (!LogFileInstance)
 	{

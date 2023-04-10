@@ -564,7 +564,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LoginPath, 15 * sizeof(wchar_t)) == 0)
 		{
 			//ArvMapRule(&filterConfig, procID, inherit, keyid);
-			ArvProcessFlagAdd(&processFlags, procID, inherit, keyid);
+			ArvProcessFlagAdd(&processFlags, procID, inherit, keyid, TRUE);
 		}
 		else if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, LogoutPath, 15 * sizeof(wchar_t)) == 0)
 		{
@@ -588,7 +588,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	else if ((Data->Iopb->TargetFileObject->FileName.Length > 15 * sizeof(wchar_t)) &&
 		(memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0 || memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, RegoutPath, 15 * sizeof(wchar_t)) == 0) &&
 		(Data->Iopb->TargetFileObject->FileName.Buffer[Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t) - 1] == L'\\' &&
-			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 7))
+			ArvCalculateCharCountWithinUnicodeString(&Data->Iopb->TargetFileObject->FileName, L'\\') == 8))
 	{
 		PSTR logintag = (PSTR)ExAllocatePoolWithTag(NonPagedPool, Data->Iopb->TargetFileObject->FileName.Length, 'LGI');
 		RtlZeroMemory(logintag, Data->Iopb->TargetFileObject->FileName.Length);
@@ -598,8 +598,9 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		PSTR timestr = NULL;
 		PSTR sigstr = NULL;
 		PSTR inheritstr = NULL;
+		PSTR oncestr = NULL;
 		bool isWChar = false;
-		int bPoint[5];
+		int bPoint[6];
 		for (UINT a = 0; a < Data->Iopb->TargetFileObject->FileName.Length / sizeof(wchar_t); a++)
 		{
 			if (Data->Iopb->TargetFileObject->FileName.Buffer[a] != L'\\')
@@ -643,12 +644,17 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				}
 				else if (b == 5)
 				{
+					bPoint[5] = a;
+					oncestr = &logintag[a + 1];
+				}
+				else if (b == 6)
+				{
 					sigstr = &logintag[a + 1];
 				}
 				b++;
 			}
 		}
-		if (isWChar || keyidstr == NULL || procstr == NULL || timestr == NULL || inheritstr == NULL || sigstr == NULL)
+		if (isWChar || keyidstr == NULL || procstr == NULL || timestr == NULL || inheritstr == NULL || oncestr == NULL || sigstr == NULL)
 		{
 			Data->IoStatus.Status = STATUS_ILLEGAL_INSTRUCTION;
 			Data->IoStatus.Information = 0;
@@ -689,6 +695,15 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		else
 		{
 			inherit = 0;
+		}
+		int once = atoi(oncestr);
+		if (once > 0)
+		{
+			once = 1;
+		}
+		else
+		{
+			once = 0;
 		}
 		PSTR pubKey = NULL;
 		if (keyid != DefaultRuleID)
@@ -733,7 +748,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 				return FLT_PREOP_COMPLETE;
 			}
-			for (UINT d = 0; d < 5; d++)
+			for (UINT d = 0; d < 6; d++)
 			{
 				logintag[bPoint[d]] = '\\';
 			}
@@ -761,7 +776,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 		if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, ReginPath, 15 * sizeof(wchar_t)) == 0)
 		{
-			ArvAddRegProc(&filterConfig, procstr, inherit, keyid);
+			ArvAddRegProc(&filterConfig, procstr, inherit, once, keyid);
 		}
 		else if (memcmp(Data->Iopb->TargetFileObject->FileName.Buffer, RegoutPath, 15 * sizeof(wchar_t)) == 0)
 		{
@@ -916,6 +931,12 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			leave;
 		}
 
+		UNICODE_STRING tests = RTL_CONSTANT_STRING(L"更新日志.txt");
+		if (RtlEqualUnicodeString(&nameInfo->FinalComponent, &tests, FALSE))
+		{
+			DbgPrint("hit");
+		}
+
 		size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
 		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
 		fullPath.Length = fullPath.MaximumLength = (USHORT)fullLen;
@@ -1040,7 +1061,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		{
 			//ArvWriteLog(L"create", &fullPath, procID, callerProcessName, TRUE);
 			//ULONG createDisposition = (Data->Iopb->Parameters.Create.Options >> 24) & 0x000000FF;
-			if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+			//if (pFlag && pFlag->Pid == procID && ArvGetRuleIDByRegProcName(&filterConfig, callerProcessName) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+			if (pFlag && pFlag->Pid == procID && pFlag->IsDaemon && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 			{
 				DbgPrint("[FsFilter:create]unauthorized process: %d - %wZ\n", procID, fullPath);
 				//cbdContext->Read = cbdContext->Write = TRUE;
@@ -1316,77 +1338,77 @@ FLT_POSTOP_CALLBACK_STATUS FLTAPI PostOperationCreate(
 	//status = STATUS_SUCCESS;
 
 
-	////
-	//// Find or create a stream context
-	////
+	//
+	// Find or create a stream context
+	//
 
-	//status = CtxFindOrCreateStreamContext(Cbd,
-	//	TRUE,
-	//	&streamContext,
-	//	&streamContextCreated);
-	//if (!NT_SUCCESS(status)) {
+	status = CtxFindOrCreateStreamContext(Cbd,
+		TRUE,
+		&streamContext,
+		&streamContextCreated);
+	if (!NT_SUCCESS(status)) {
 
-	//	//
-	//	//  This failure will most likely be because stream contexts are not supported
-	//	//  on the object we are trying to assign a context to or the object is being 
-	//	//  deleted
-	//	//  
+		//
+		//  This failure will most likely be because stream contexts are not supported
+		//  on the object we are trying to assign a context to or the object is being 
+		//  deleted
+		//  
 
-	//	DbgPrint("[Ctx]: CtxPostCreate -> Failed to find or create stream context (Cbd = %p, FileObject = %p)\n",
-	//		Cbd,
-	//		FltObjects->FileObject);
-	//	opStatus = FLT_POSTOP_FINISHED_PROCESSING;
-	//	goto CtxPostCreateCleanup;
-	//}
+		DbgPrint("[Ctx]: CtxPostCreate -> Failed to find or create stream context (Cbd = %p, FileObject = %p)\n",
+			Cbd,
+			FltObjects->FileObject);
+		opStatus = FLT_POSTOP_FINISHED_PROCESSING;
+		goto CtxPostCreateCleanup;
+	}
 
-	///*DbgPrint("[Ctx]: CtxPostCreate -> Getting/Creating stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
-	//	&nameInfo->Name,
-	//	Cbd,
-	//	FltObjects->FileObject,
-	//	streamContext,
-	//	streamContextCreated);*/
+	/*DbgPrint("[Ctx]: CtxPostCreate -> Getting/Creating stream context for file %wZ (Cbd = %p, FileObject = %p, StreamContext = %p. StreamContextCreated = %x)\n",
+		&nameInfo->Name,
+		Cbd,
+		FltObjects->FileObject,
+		streamContext,
+		streamContextCreated);*/
 
-	//	//
-	//	//  Acquire write acccess to the context
-	//	//
+		//
+		//  Acquire write acccess to the context
+		//
 
-	//ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
-	////
-	////  Increment the create count
-	////
-	//if (createContext)
-	//{
-	//	streamContext->UnderDBPath = createContext->UnderDBPath;
-	//}
+	//
+	//  Increment the create count
+	//
+	if (createContext)
+	{
+		streamContext->UnderDBPath = createContext->UnderDBPath;
+	}
 
-	//ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
-	//if (streamContextCreated || 0 == wcslen(streamContext->FileName))
-	//{
-	//	status = ArvGetFileNameOrExtension(Cbd, NULL, FileName);
+	if (streamContextCreated || 0 == wcslen(streamContext->FileName))
+	{
+		status = ArvGetFileNameOrExtension(Cbd, NULL, FileName);
 
-	//	if (STATUS_SUCCESS != status)
-	//	{
-	//		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ArvGetFileNameOrExtension failed. Status = 0x%x.\n", __FUNCTION__, status));
-	//		goto CtxPostCreateCleanup;
-	//	}
+		if (STATUS_SUCCESS != status)
+		{
+			ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ArvGetFileNameOrExtension failed. Status = 0x%x.\n", __FUNCTION__, status));
+			goto CtxPostCreateCleanup;
+		}
 
-	//	ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ContextCreated Fcb = %p FileName = %ws.\n", __FUNCTION__,
-	//		FltObjects->FileObject->FsContext,
-	//		FileName));
+		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES, ("%s->ContextCreated Fcb = %p FileName = %ws.\n", __FUNCTION__,
+			FltObjects->FileObject->FsContext,
+			FileName));
 
 
-	//	ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
+		ExEnterCriticalRegionAndAcquireResourceExclusive(streamContext->Resource);
 
-	//	RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
+		RtlZeroMemory(streamContext->FileName, ARV_MAX_NAME_LENGTH * sizeof(WCHAR));
 
-	//	if (wcslen(FileName) < ARV_MAX_NAME_LENGTH)
-	//		RtlMoveMemory(streamContext->FileName, FileName, wcslen(FileName) * sizeof(WCHAR));
+		if (wcslen(FileName) < ARV_MAX_NAME_LENGTH)
+			RtlMoveMemory(streamContext->FileName, FileName, wcslen(FileName) * sizeof(WCHAR));
 
-	//	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
-	// }
+	 }
 
 
 CtxPostCreateCleanup:
@@ -1414,62 +1436,6 @@ CtxPostCreateCleanup:
 
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
-
-FLT_POSTOP_CALLBACK_STATUS PostOperationCreate2(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_ PCFLT_RELATED_OBJECTS FltObjects,
-	_In_opt_ PVOID CompletionContext,
-	_In_ FLT_POST_OPERATION_FLAGS Flags
-)
-{
-	UNREFERENCED_PARAMETER(Data);
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-	UNREFERENCED_PARAMETER(Flags);
-
-	FLT_POSTOP_CALLBACK_STATUS Status = FLT_POSTOP_FINISHED_PROCESSING;
-
-	if (FlagOn(Flags, FLTFL_POST_OPERATION_DRAINING))
-	{
-		if (CompletionContext)
-		{
-			ExFreePoolWithTag(CompletionContext, 'POC');
-		}
-		goto EXIT;
-	}
-
-	/*
-	* 如果FO创建失败，不进入PocFindOrCreateStreamContext
-	*/
-	if (STATUS_SUCCESS != Data->IoStatus.Status)
-	{
-		Status = FLT_POSTOP_FINISHED_PROCESSING;
-		if (CompletionContext)
-		{
-			ExFreePoolWithTag(CompletionContext, 'POC');
-		}
-		goto EXIT;
-	}
-
-	if (!FltDoCompletionProcessingWhenSafe(Data,
-		FltObjects,
-		CompletionContext,
-		Flags,
-		PostOperationCreate,
-		&Status))
-	{
-		ARV_DBG_PRINT(ARVDBG_TRACE_ROUTINES,
-			("%s->FltDoCompletionProcessingWhenSafe failed. Status = 0x%x.\n",
-				__FUNCTION__,
-				Status));
-	}
-
-EXIT:
-
-	return Status;
-}
-
-
 
 FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 	_Inout_ PFLT_CALLBACK_DATA Data,
@@ -2137,7 +2103,7 @@ out1:
 	//
 	// Get the stream context
 	//
-
+	
 	status = CtxFindOrCreateStreamContext(Cbd,
 		FALSE,     // do not create if one does not exist
 		&streamContext,
@@ -2386,7 +2352,11 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 		ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
 		if (entry != NULL)
 		{
-			ArvProcessFlagAdd(&processFlags, ChildId, inherit, ruleID);
+			ArvProcessFlagAdd(&processFlags, ChildId, inherit, ruleID, FALSE);
+			if (entry->Once)
+			{
+				ArvFreeRegProc(&filterConfig, cProcName);
+			}
 		}
 		else
 		{
@@ -2408,7 +2378,7 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 				{
 					if (pPFlag->Inherit)
 					{
-						ArvProcessFlagAdd(&processFlags, ChildId, FALSE, pPFlag->RuleID);
+						ArvProcessFlagAdd(&processFlags, ChildId, FALSE, pPFlag->RuleID, FALSE);
 					}
 				}
 			}
@@ -2419,7 +2389,7 @@ VOID CreateProcessNotify(IN HANDLE  ParentId, IN HANDLE  ChildId, IN BOOLEAN  Cr
 				{
 					if (pGFlag->Inherit)
 					{
-						ArvProcessFlagAdd(&processFlags, ChildId, FALSE, pGFlag->RuleID);
+						ArvProcessFlagAdd(&processFlags, ChildId, FALSE, pGFlag->RuleID, FALSE);
 					}
 				}
 			}
@@ -2868,7 +2838,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	WPP_INIT_TRACING(DriverObject, RegistryPath);
 	TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry,RegPath: %wZ", RegistryPath);*/
 	ArvInitLog(NULL);
-	ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
+	//ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 	NTSTATUS status = STATUS_SUCCESS;
 	PSECURITY_DESCRIPTOR sd = NULL;
 	OBJECT_ATTRIBUTES oa = { 0 };

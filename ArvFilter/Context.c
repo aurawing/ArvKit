@@ -31,6 +31,15 @@ Return Value:
 
 	DbgPrint("[Ctx]: Allocating stream context \n");
 
+	/*if (g_minifilterHandle == filter)
+	{
+		DbgPrint("============= same filter instance ================\n");
+	}
+	else
+	{
+		DbgPrint("============= diff filter instance ================\n");
+	}*/
+
 	status = FltAllocateContext(g_minifilterHandle,
 		FLT_STREAM_CONTEXT,
 		ARV_STREAM_CONTEXT_SIZE,
@@ -62,7 +71,7 @@ Return Value:
 
 	streamContext->Resource = CtxAllocateResource();
 	if (streamContext->Resource == NULL) {
-
+		ExFreePoolWithTag(streamContext->FileName, CTX_STRING_TAG);
 		FltReleaseContext(streamContext);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -115,9 +124,9 @@ Return Value:
 	//  First try to get the stream context.
 	//
 
-	DbgPrint("------------- [Ctx]: Trying to get stream context (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
+	DbgPrint("------------- [Ctx]: Trying to get stream context (FileObject = %p, Instance = %p)\n",
 		Cbd->Iopb->TargetFileObject,
-		Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
+		Cbd->Iopb->TargetInstance);
 
 	status = FltGetStreamContext(Cbd->Iopb->TargetInstance,
 		Cbd->Iopb->TargetFileObject,
@@ -138,9 +147,9 @@ Return Value:
 		//  Create a stream context
 		//
 
-		DbgPrint("------------- [Ctx]: Creating stream context (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
+		DbgPrint("------------- [Ctx]: Creating stream context (FileObject = %p, Instance = %p)\n",
 			Cbd->Iopb->TargetFileObject,
-			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
+			Cbd->Iopb->TargetInstance);
 
 		status = CtxCreateStreamContext(&streamContext);
 
@@ -159,21 +168,16 @@ Return Value:
 		//  Set the new context we just allocated on the file object
 		//
 
-		DbgPrint("------------- [Ctx]: Setting stream context %p (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
+		DbgPrint("------------- [Ctx]: Setting stream context %p (FileObject = %p, Instance = %p)\n",
 			streamContext,
 			Cbd->Iopb->TargetFileObject,
-			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
+			Cbd->Iopb->TargetInstance);
 
 		status = FltSetStreamContext(Cbd->Iopb->TargetInstance,
 			Cbd->Iopb->TargetFileObject,
 			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
 			streamContext,
 			&oldStreamContext);
-
-		DbgPrint("------------- [Ctx]: After setting stream context %p (FileObject = %p, Instance = %p), IRQL = 0x%x\n",
-			streamContext,
-			Cbd->Iopb->TargetFileObject,
-			Cbd->Iopb->TargetInstance, KeGetCurrentIrql());
 
 		if (!NT_SUCCESS(status)) {
 

@@ -45,6 +45,7 @@ typedef struct _RegProcEntry {
 	PSTR ProcName;
 	BOOL Inherit;
 	UINT RuleID;
+	BOOL Once;
 } RegProcEntry, *PRegProcEntry;
 
 //π˝¬ÀπÊ‘Ú
@@ -65,6 +66,7 @@ typedef struct _ProcessFlag {
 	UINT Pid;
 	BOOL Inherit;
 	UINT RuleID;
+	BOOL IsDaemon;
 	UT_hash_handle hh;
 } ProcessFlag, *PProcessFlag;
 
@@ -111,7 +113,7 @@ VOID ArvAddRuleEntry2(PLIST_ENTRY pHead, PRuleEntry entry, BOOL underDBPath);
 VOID ArvFreeRuleEntry2(PLIST_ENTRY pHead);
 UINT ArvGetRuleIDByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
 PRegProcEntry ArvGetRegProcEntryByRegProcName(PFilterConfig pFilterConfig, PSTR procName);
-VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UINT ruleID);
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, BOOL once, UINT ruleID);
 BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName);
 VOID ArvFreeRegProcs(PFilterConfig pFilterConfig);
 BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path);
@@ -121,7 +123,7 @@ VOID ArvFreeUnicodeString(PUNICODE_STRING str, ULONG tag);
 
 VOID ArvProcessFlagInit(PProcessFlags pFlags);
 VOID ArvProcessFlagRelease(PProcessFlags pFlags);
-VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID);
+VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID, BOOL isDaemon);
 PProcessFlag ArvProcessFlagFind(PProcessFlags pFlags, UINT pid);
 VOID ArvProcessFlagDelete(PProcessFlags pFlags, UINT pid);
 

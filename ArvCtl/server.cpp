@@ -313,10 +313,18 @@ void process(WFHttpTask *server_task)
 						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
 						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
 						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
+						cJSON *onceEntry = cJSON_GetObjectItem(pJsonDataItem, "once");
 						if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || procNameEntry->type != cJSON_String || keyIDEntry->type != cJSON_Number || (inheritEntry->type != cJSON_True && inheritEntry->type != cJSON_False))
 						{
 							succ = false;
 							break;
+						}
+						if (onceEntry != NULL && (onceEntry->type == cJSON_True || onceEntry->type == cJSON_False))
+						{
+							if (cJSON_IsTrue(onceEntry))
+								params[i].once = true;
+							else
+								params[i].once = false;
 						}
 						params[i].procName = procNameEntry->valuestring;
 						if (cJSON_IsTrue(inheritEntry))
@@ -367,10 +375,18 @@ void process(WFHttpTask *server_task)
 						cJSON *procNameEntry = cJSON_GetObjectItem(pJsonDataItem, "procName");
 						cJSON *inheritEntry = cJSON_GetObjectItem(pJsonDataItem, "inherit");
 						cJSON *keyIDEntry = cJSON_GetObjectItem(pJsonDataItem, "keyID");
+						cJSON *onceEntry = cJSON_GetObjectItem(pJsonDataItem, "once");
 						if (procNameEntry == NULL || inheritEntry == NULL || procNameEntry->type != cJSON_String || (inheritEntry->type != cJSON_True && inheritEntry->type != cJSON_False))
 						{
 							succ = false;
 							break;
+						}
+						if (onceEntry != NULL && (onceEntry->type == cJSON_True || onceEntry->type == cJSON_False))
+						{
+							if (cJSON_IsTrue(onceEntry))
+								params[i].once = true;
+							else
+								params[i].once = false;
 						}
 						params[i].procName = procNameEntry->valuestring;
 						if (cJSON_IsTrue(inheritEntry))
@@ -666,6 +682,7 @@ void process(WFHttpTask *server_task)
 			cJSON *procNameEntry = cJSON_GetObjectItem(jsonHead, "procName");
 			cJSON *inheritEntry = cJSON_GetObjectItem(jsonHead, "inherit");
 			cJSON *keyIDEntry = cJSON_GetObjectItem(jsonHead, "keyID");
+			cJSON *onceEntry = cJSON_GetObjectItem(jsonHead, "once");
 			cJSON *addEntry = cJSON_GetObjectItem(jsonHead, "add");
 
 			if (procNameEntry == NULL || inheritEntry == NULL || keyIDEntry == NULL || addEntry == NULL ||
@@ -676,7 +693,15 @@ void process(WFHttpTask *server_task)
 			}
 			else
 			{
-				BOOL ret = UpdateRegProcConfig(procNameEntry->valuestring, cJSON_IsTrue(inheritEntry), keyIDEntry->valueint, cJSON_IsTrue(addEntry));
+				BOOL once = false;
+				if (onceEntry != NULL && (onceEntry->type == cJSON_True || onceEntry->type == cJSON_False))
+				{
+					if (cJSON_IsTrue(onceEntry))
+						once = true;
+					else
+						once = false;
+				}
+				BOOL ret = UpdateRegProcConfig(procNameEntry->valuestring, cJSON_IsTrue(inheritEntry), keyIDEntry->valueint, once, cJSON_IsTrue(addEntry));
 				if (ret) {
 					user_resp->set_status_code("200");
 					user_resp->append_output_body("{\"code\": 0, \"msg\": \"success\", \"data\": {}}");
@@ -1226,7 +1251,7 @@ void process(WFHttpTask *server_task)
 			if (thresholdEntry == NULL || thresholdEntry->type != cJSON_Number || intervalEntry == NULL || intervalEntry->type != cJSON_Number)
 			{
 				user_resp->set_status_code("500");
-				user_resp->append_output_body("{\"code\": -170, \"msg\": \"threshold and interval parameters must be exist\", \"data\": {}}");
+				user_resp->append_output_body("{\"code\": -200, \"msg\": \"threshold and interval parameters must be exist\", \"data\": {}}");
 			}
 			else
 			{
@@ -1241,7 +1266,7 @@ void process(WFHttpTask *server_task)
 					if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("AbnormalThreshold"), 0, REG_DWORD, (CONST BYTE*)&threshold, sizeof(DWORD)))
 					{
 						user_resp->set_status_code("500");
-						user_resp->append_output_body("{\"code\": -172, \"msg\": \"save registry of abnormal threshold failed\", \"data\": {}}");
+						user_resp->append_output_body("{\"code\": -202, \"msg\": \"save registry of abnormal threshold failed\", \"data\": {}}");
 					}
 					else
 					{
@@ -1249,7 +1274,7 @@ void process(WFHttpTask *server_task)
 						if (ERROR_SUCCESS != ::RegSetValueEx(hKey, _T("AbnormalInterval"), 0, REG_DWORD, (CONST BYTE*)&interval, sizeof(DWORD)))
 						{
 							user_resp->set_status_code("500");
-							user_resp->append_output_body("{\"code\": -173, \"msg\": \"save registry of abnormal interval failed\", \"data\": {}}");
+							user_resp->append_output_body("{\"code\": -203, \"msg\": \"save registry of abnormal interval failed\", \"data\": {}}");
 						}
 						else
 						{
@@ -1262,7 +1287,7 @@ void process(WFHttpTask *server_task)
 				}
 				else {
 					user_resp->set_status_code("500");
-					user_resp->append_output_body("{\"code\": -171, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
+					user_resp->append_output_body("{\"code\": -201, \"msg\": \"open registry of ArvCtl config failed\", \"data\": {}}");
 				}
 			}
 		}

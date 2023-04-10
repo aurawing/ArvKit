@@ -21,6 +21,7 @@ typedef struct _SaveRegProcParam {
 	PSTR procName;
 	BOOL inherit;
 	UINT ruleID;
+	BOOL once;
 } SaveRegProcParam, *PSaveRegProcParam;
 
 BOOL InitSysConfig();
@@ -39,7 +40,7 @@ PSTR LoadDBConf();
 BOOL InitRegProcConfig();
 BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen);
 BOOL UpdateAuthProcsConfig(PSaveRegProcParam params, UINT regProcSize);
-BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add);
+BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL once, BOOL add);
 void ClearRegProcConfig();
 
 BOOL InitDaemonConfig();

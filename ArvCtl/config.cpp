@@ -232,6 +232,12 @@ BOOL ConfigRegProcs()
 			else if (cJSON_IsFalse(pJsonRegProcItem))
 				pRegProc->inherit = FALSE;
 
+			pJsonRegProcItem = cJSON_GetObjectItem(pJsonRegProc, "once");
+			if (cJSON_IsTrue(pJsonRegProcItem))
+				pRegProc->once = TRUE;
+			else if (cJSON_IsFalse(pJsonRegProcItem))
+				pRegProc->once = FALSE;
+
 			pzpRegProcs[i] = pRegProc;
 		}
 		result = SendSetRegProcsMessage(pzpRegProcs, regProcSize);
@@ -630,6 +636,8 @@ BOOL UpdateAuthProcsConfig(PSaveRegProcParam params, UINT regProcSize)
 				pRegProc->inherit = params[i].inherit;
 			else if (cJSON_IsFalse(pJsonRegProcItem))
 				pRegProc->inherit = FALSE;*/
+			pRegProc->inherit = params[i].inherit;
+			pRegProc->once = params[i].once;
 
 			pzpRegProcs[i] = pRegProc;
 		}
@@ -670,6 +678,7 @@ BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen)
 		cJSON_AddItemToObject(item, "procName", cJSON_CreateString(params[i].procName));
 		cJSON_AddItemToObject(item, "inherit", cJSON_CreateBool(params[i].inherit));
 		cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(params[i].ruleID));
+		cJSON_AddItemToObject(item, "once", cJSON_CreateBool(params[i].once));
 		cJSON_AddItemToArray(regProcConfig, item);
 	}
 	errno_t err;
@@ -687,7 +696,7 @@ BOOL UpdateRegProcsConfig(PSaveRegProcParam params, UINT dataLen)
 	return ConfigRegProcs();
 }
 
-BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add)
+BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL once, BOOL add)
 {
 	AcquireSRWLockExclusive(&regProcLock);
 	if (regProcConfig == NULL)
@@ -714,6 +723,7 @@ BOOL UpdateRegProcConfig(PSTR procName, BOOL inherit, INT keyID, BOOL add)
 		cJSON_AddItemToObject(item, "procName", cJSON_CreateString(procName));
 		cJSON_AddItemToObject(item, "inherit", cJSON_CreateBool(inherit));
 		cJSON_AddItemToObject(item, "keyID", cJSON_CreateNumber(keyID));
+		cJSON_AddItemToObject(item, "once", cJSON_CreateBool(once));
 		if (selindex >= 0)
 		{
 			cJSON_ReplaceItemInArray(regProcConfig, selindex, item);

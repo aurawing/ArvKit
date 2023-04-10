@@ -66,7 +66,11 @@ NTSTATUS RecoveryRegProcs(PFilterConfig pFilterConfig)
 					PRegProcEntry pRegProcEntry = CONTAINING_RECORD(pListEntry, RegProcEntry, entry);
 					if (strcmp(pRegProcEntry->ProcName, pStrProcessName) == 0)
 					{
-						ArvProcessFlagAdd(&processFlags, pProcIndex->ProcessId, pRegProcEntry->Inherit, pRegProcEntry->RuleID);
+						ArvProcessFlagAdd(&processFlags, pProcIndex->ProcessId, pRegProcEntry->Inherit, pRegProcEntry->RuleID, FALSE);
+						if (pRegProcEntry->Once)
+						{
+							ArvFreeRegProc(&filterConfig, pStrProcessName);
+						}
 					}
 					pListEntry = pListEntry->Flink;
 				}
@@ -165,7 +169,7 @@ MiniMessage(
 				/*ExEnterCriticalRegionAndAcquireResourceExclusive(&HashResource);
 				BOOL ret = ArvMapRule(&filterConfig, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);*/
-				ArvProcessFlagAdd(&processFlags, pOpSetProc->procID, FALSE, pOpSetProc->ruleID);
+				ArvProcessFlagAdd(&processFlags, pOpSetProc->procID, FALSE, pOpSetProc->ruleID, FALSE);
 				DbgPrint("[FsFilter:MiniMessage]add procID: %d - %d\n", pOpSetProc->procID, pOpSetProc->ruleID);
 				*ReturnOutputBufferLength = (ULONG)sizeof(buffer);
 				RtlCopyMemory(OutputBuffer, buffer, *ReturnOutputBufferLength);
@@ -176,7 +180,7 @@ MiniMessage(
 				ArvFreeRegProcs(&filterConfig);
 				for (UINT i = 0; i < pOpSetRegProcs->regProcLen; i++)
 				{
-					ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->ruleID);
+					ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->once, pOpSetRegProcs->regProcs[i]->ruleID);
 				}
 				RecoveryRegProcs(&filterConfig);
 				ExReleaseResourceAndLeaveCriticalRegion(&HashResource);
@@ -370,7 +374,7 @@ MiniMessage(
 					}
 					if (flag)
 					{
-						ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->ruleID);
+						ArvAddRegProc(&filterConfig, pOpSetRegProcs->regProcs[i]->procName, pOpSetRegProcs->regProcs[i]->inherit, pOpSetRegProcs->regProcs[i]->once, pOpSetRegProcs->regProcs[i]->ruleID);
 					}
 				}
 				RecoveryRegProcs(&filterConfig);

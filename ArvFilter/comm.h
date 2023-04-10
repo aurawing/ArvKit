@@ -133,6 +133,7 @@ typedef struct _OpRegProc {
 	PSTR procName;
 	BOOL inherit;
 	UINT ruleID;
+	BOOL once;
 } OpRegProc, *POpRegProc;
 
 typedef struct _OpSetRegProcs {

@@ -289,7 +289,7 @@ PRegProcEntry ArvGetRegProcEntryByRegProcName(PFilterConfig pFilterConfig, PSTR 
 	return NULL;
 }
 
-VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UINT ruleID)
+VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, BOOL once, UINT ruleID)
 {
 	PLIST_ENTRY pListEntry = pFilterConfig->RegProcs.Flink;
 	while (pListEntry != &pFilterConfig->RegProcs)
@@ -299,6 +299,7 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UIN
 		{
 			pRegProcEntry->RuleID = ruleID;
 			pRegProcEntry->Inherit = inherit;
+			pRegProcEntry->Once = once;
 			return;
 		}
 		pListEntry = pListEntry->Flink;
@@ -311,6 +312,7 @@ VOID ArvAddRegProc(PFilterConfig pFilterConfig, PSTR procName, BOOL inherit, UIN
 	pRegProcEntry->ProcName = regProcName;
 	pRegProcEntry->RuleID = ruleID;
 	pRegProcEntry->Inherit = inherit;
+	pRegProcEntry->Once = once;
 	InsertTailList(&pFilterConfig->RegProcs, &pRegProcEntry->entry);
 }
 
@@ -328,6 +330,7 @@ BOOL ArvFreeRegProc(PFilterConfig pFilterConfig, PSTR procName)
 			pRegProcEntry->ProcName = NULL;
 			pRegProcEntry->RuleID = 0;
 			pRegProcEntry->Inherit = FALSE;
+			pRegProcEntry->Once = FALSE;
 			ExFreePoolWithTag(pRegProcEntry, 'FME');
 			pRegProcEntry = NULL;
 			return TRUE;
@@ -436,13 +439,15 @@ VOID ArvProcessFlagRelease(PProcessFlags pFlags)
 	ExDeleteResourceLite(&pFlags->Res);
 }
 
-VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID)
+VOID ArvProcessFlagAdd(PProcessFlags pFlags, UINT pid, BOOL inherit, UINT ruleID, BOOL isDaemon)
 {
 	ExEnterCriticalRegionAndAcquireResourceExclusive(&pFlags->Res);
 	PProcessFlag pflag = (PProcessFlag)ExAllocatePoolWithTag(NonPagedPool, sizeof(ProcessFlag), 'pcfg');
+	RtlZeroMemory(pflag, sizeof(ProcessFlag));
 	pflag->Pid = pid;
 	pflag->Inherit = inherit;
 	pflag->RuleID = ruleID;
+	pflag->IsDaemon = isDaemon;
 	HASH_ADD_INT(pFlags->Flags, Pid, pflag);
 	ExReleaseResourceAndLeaveCriticalRegion(&pFlags->Res);
 }
@@ -459,6 +464,7 @@ PProcessFlag ArvProcessFlagFind(PProcessFlags pFlags, UINT pid)
 		pFlag->Pid = tmp->Pid;
 		pFlag->Inherit = tmp->Inherit;
 		pFlag->RuleID = tmp->RuleID;
+		pFlag->IsDaemon = tmp->IsDaemon;
 	}
 	ExReleaseResourceAndLeaveCriticalRegion(&pFlags->Res);
 	return pFlag;
