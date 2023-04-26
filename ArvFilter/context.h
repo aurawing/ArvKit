@@ -2,10 +2,9 @@
 
 #include <fltKernel.h>
 
+#include "pch.h"
 #include "global.h"
 #include "utils.h"
-
-
 
 typedef struct _CreateContext {
 
@@ -27,6 +26,7 @@ typedef struct _ARV_VOLUME_CONTEXT {
 	//
 
 	ULONG SectorSize;
+	BOOL IsRaw;
 
 } ARV_VOLUME_CONTEXT, *PARV_VOLUME_CONTEXT;
 
@@ -73,3 +73,11 @@ CtxStreamContextCleanup(
 	_In_ PFLT_CONTEXT Context,
 	_In_ FLT_CONTEXT_TYPE ContextType
 );
+
+//NTSTATUS
+//CtxFindOrCreateStreamContext2(
+//	_In_ PFLT_CALLBACK_DATA Cbd,
+//	_In_ BOOLEAN CreateIfNotFound,
+//	_Outptr_ PARV_STREAM_CONTEXT *StreamContext,
+//	_Out_opt_ PBOOLEAN ContextCreated
+//);

@@ -26,3 +26,4 @@ NTSTATUS ArvWriteLog(PCWSTR type, PUNICODE_STRING path, UINT procID, PSTR proces
 NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead, BOOLEAN read, BOOLEAN isFolder, BOOLEAN pass, BOOLEAN abnormal);
 NTSTATUS ArvClearFileEx(LogType type);
 NTSTATUS ArvWriteSystemProcess();
+//NTSTATUS ArvWriteDebug(PVOID arg1, PVOID arg2);

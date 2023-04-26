@@ -33,6 +33,7 @@ Environment:
 //
 //  Includes
 //
+#define _NO_CRT_STDIO_INLINE
 
 #include <fltKernel.h>
 #include <windef.h>

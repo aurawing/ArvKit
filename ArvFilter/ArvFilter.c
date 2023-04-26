@@ -184,39 +184,39 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationRead(
 		goto CtxPreReadCleanup;
 	}
 
-	status = CtxFindOrCreateStreamContext(Data,
-		FALSE,     // do not create if one does not exist
-		&streamContext,
-		&streamContextCreated);
-	if (!NT_SUCCESS(status)) {
+	//status = CtxFindOrCreateStreamContext(Data,
+	//	FALSE,     // do not create if one does not exist
+	//	&streamContext,
+	//	&streamContextCreated);
+	//if (!NT_SUCCESS(status)) {
 
-		//
-		//  This failure will most likely be because stream contexts are not supported
-		//  on the object we are trying to assign a context to or the object is being 
-		//  deleted
-		//  
+	//	//
+	//	//  This failure will most likely be because stream contexts are not supported
+	//	//  on the object we are trying to assign a context to or the object is being 
+	//	//  deleted
+	//	//  
 
-		DbgPrint("[Ctx]: CtxPostRead -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
-			Data,
-			FltObjects->FileObject);
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
-		goto CtxPreReadCleanup1;
-	}
+	//	DbgPrint("[Ctx]: CtxPostRead -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
+	//		Data,
+	//		FltObjects->FileObject);
+	//	status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	//	goto CtxPreReadCleanup1;
+	//}
 
-	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
-	/*if (!streamContext->Read)
-	{
-		status = FLT_PREOP_COMPLETE;
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-		Data->IoStatus.Information = 0;
-		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
-		goto CtxPreReadCleanup;
-	}*/
-	if (streamContext->UnderDBPath)
-	{
-		InterlockedIncrement64(&filterConfig.readCountDB);
-	}
-	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	//ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
+	///*if (!streamContext->Read)
+	//{
+	//	status = FLT_PREOP_COMPLETE;
+	//	Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+	//	Data->IoStatus.Information = 0;
+	//	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	//	goto CtxPreReadCleanup;
+	//}*/
+	//if (streamContext->UnderDBPath)
+	//{
+	//	InterlockedIncrement64(&filterConfig.readCountDB);
+	//}
+	//ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
 CtxPreReadCleanup1:
 
@@ -250,40 +250,39 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationWrite(
 		//status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		goto CtxPreWriteCleanup;
 	}
+	//status = CtxFindOrCreateStreamContext(Data,
+	//	FALSE,     // do not create if one does not exist
+	//	&streamContext,
+	//	&streamContextCreated);
+	//if (!NT_SUCCESS(status)) {
 
-	status = CtxFindOrCreateStreamContext(Data,
-		FALSE,     // do not create if one does not exist
-		&streamContext,
-		&streamContextCreated);
-	if (!NT_SUCCESS(status)) {
+	//	//
+	//	//  This failure will most likely be because stream contexts are not supported
+	//	//  on the object we are trying to assign a context to or the object is being 
+	//	//  deleted
+	//	//  
 
-		//
-		//  This failure will most likely be because stream contexts are not supported
-		//  on the object we are trying to assign a context to or the object is being 
-		//  deleted
-		//  
+	//	DbgPrint("[Ctx]: CtxPreWrite -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
+	//		Data,
+	//		FltObjects->FileObject);
+	//	status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	//	goto CtxPreWriteCleanup1;
+	//}
 
-		DbgPrint("[Ctx]: CtxPreWrite -> Failed to find stream context (Cbd = %p, FileObject = %p)\n",
-			Data,
-			FltObjects->FileObject);
-		status = FLT_PREOP_SUCCESS_NO_CALLBACK;
-		goto CtxPreWriteCleanup1;
-	}
-
-	ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
-	/*if (!streamContext->Write)
-	{
-		status = FLT_PREOP_COMPLETE;
-		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-		Data->IoStatus.Information = 0;
-		ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
-		goto CtxPreWriteCleanup;
-	}*/
-	if (streamContext->UnderDBPath)
-	{
-		InterlockedIncrement64(&filterConfig.writeCountDB);
-	}
-	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	//ExEnterCriticalRegionAndAcquireResourceShared(streamContext->Resource);
+	///*if (!streamContext->Write)
+	//{
+	//	status = FLT_PREOP_COMPLETE;
+	//	Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+	//	Data->IoStatus.Information = 0;
+	//	ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
+	//	goto CtxPreWriteCleanup;
+	//}*/
+	//if (streamContext->UnderDBPath)
+	//{
+	//	InterlockedIncrement64(&filterConfig.writeCountDB);
+	//}
+	//ExReleaseResourceAndLeaveCriticalRegion(streamContext->Resource);
 
 CtxPreWriteCleanup1:
 
@@ -867,6 +866,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		createDisposition = 1;
 	}
 
+	if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE))
+	{
+		createDisposition = 0;
+		createDisposition2 = 0;
+	}
 
 	UINT ForD = 0;
 	UINT RorW = 0;
@@ -894,6 +898,22 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			DbgPrint("[FsFilter:create]Error getting volume context, status=%x\n", status);
 			leave;
 		}
+
+		//check if block device is operated
+		/*if (volCtx->IsRaw) {
+			if (createDisposition == 0)
+			{
+				DbgPrint("[FsFilter:create]Write raw device is disabled, device=%wZ\n", volCtx->VolumeName);
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				Data->IoStatus.Information = 0;
+				status = FLT_PREOP_COMPLETE;
+				leave;
+			}
+			else
+			{
+				DbgPrint("[FsFilter:create]Read raw device is enabled, device=%wZ\n", volCtx->VolumeName);
+			}
+		}*/
 
 		status = PsLookupProcessByProcessId((HANDLE)procID, &pCallerProcess);
 		if (NT_SUCCESS(status))
@@ -931,11 +951,11 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			leave;
 		}
 
-		UNICODE_STRING tests = RTL_CONSTANT_STRING(L"更新日志.txt");
-		if (RtlEqualUnicodeString(&nameInfo->FinalComponent, &tests, FALSE))
-		{
-			DbgPrint("hit");
-		}
+		//UNICODE_STRING tests = RTL_CONSTANT_STRING(L"新建文件夹");
+		//if (RtlEqualUnicodeString(&nameInfo->FinalComponent, &tests, FALSE))
+		//{
+		//	DbgPrint("hit");
+		//}
 
 		size_t fullLen = dosName.Length + nameInfo->Name.Length - nameInfo->Volume.Length;
 		fullPath.Buffer = (PWSTR)ExAllocatePoolWithTag(NonPagedPool, fullLen, 'POC');
@@ -1082,7 +1102,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					//cbdContext->Read = cbdContext->Write = TRUE;
 				}
-				else if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, ArvGetSystemRoot()->Buffer, 3 * sizeof(wchar_t)) == 0 && (FILE_OPEN == createDisposition && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
+				else if (fullPath.Length >= 3 * sizeof(wchar_t) && memcmp(fullPath.Buffer, ArvGetSystemRoot()->Buffer, 3 * sizeof(wchar_t)) == 0 && (FILE_OPEN == createDisposition2 && !FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)))
 				{
 					DbgPrint("[FsFilter:create]allowed system process: %d(%s) - %wZ\n", procID, callerProcessName, fullPath);
 					//cbdContext->Read = TRUE;
@@ -1532,6 +1552,16 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			DbgPrint("[FsFilter:setinfo]Error getting volume context, status=%x\n", status);
 			leave;
 		}
+
+		//check if block device is operated
+		/*if (volCtx->IsRaw)
+		{
+			DbgPrint("[FsFilter:create]Write to device is disabled, device=%wZ\n", volCtx->VolumeName);
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			Data->IoStatus.Information = 0;
+			status = FLT_PREOP_COMPLETE;
+			leave;
+		}*/
 
 		status2 = PsLookupProcessByProcessId((HANDLE)procID, &pCallerProcess);
 		if (status2 == STATUS_SUCCESS)
@@ -2539,6 +2569,8 @@ VOID ArvInstanceSetupWhenSafe(
 			leave;
 		}
 
+		RtlZeroMemory(ctx, ARV_VOLUME_CONTEXT_SIZE);
+
 		//
 		//  Always get the volume properties, so I can get a sector size
 		//
@@ -2568,6 +2600,16 @@ VOID ArvInstanceSetupWhenSafe(
 		//
 
 		ctx->VolumeName.Buffer = NULL;
+
+		UNICODE_STRING rawPattern = RTL_CONSTANT_STRING(L"\\FileSystem\\RAW");
+		if (RtlEqualUnicodeString(&volProp->FileSystemDriverName, &rawPattern, TRUE))
+		{
+			ctx->IsRaw = TRUE;
+		}
+		else
+		{
+			ctx->IsRaw = FALSE;
+		}
 
 		//
 		//  Get the storage device object we want a name for.

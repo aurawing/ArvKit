@@ -2150,3 +2150,140 @@ CLEAN:
 	//ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
 	return Status;
 }
+
+//NTSTATUS ArvWriteDebug(PVOID arg1, PVOID arg2) {
+//
+//	HANDLE LogFileHandle = { 0 };
+//	PFILE_OBJECT LogFileObject = { 0 };
+//	PFLT_INSTANCE LogFileInstance = { 0 };
+//	PFLT_VOLUME LogVolume = { 0 };
+//	NTSTATUS Status = STATUS_SUCCESS;
+//	OBJECT_ATTRIBUTES ObjectAttributes;
+//	UNICODE_STRING  LogVolumeName = { 0 };
+//	UNICODE_STRING logType = { 0 };
+//	WCHAR logTypeBuf[10];
+//	IO_STATUS_BLOCK IoStatusBlock;
+//
+//	RtlInitEmptyUnicodeString(&logType, logTypeBuf, 10 * sizeof(WCHAR));
+//
+//	PUNICODE_STRING pLog = &LogPath;
+//
+//	USHORT pathLen = pLog->Length;
+//	pLog->Length = 12;
+//	Status = ArvQuerySymbolicLink(pLog, &LogVolumeName);
+//	pLog->Length = pathLen;
+//	if (!NT_SUCCESS(Status))
+//	{
+//		goto CLEAN;
+//	}
+//
+//	InitializeObjectAttributes(
+//		&ObjectAttributes,
+//		pLog,
+//		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+//		NULL,
+//		NULL);
+//
+//	LogFileInstance = XBFltGetVolumeInstance(g_minifilterHandle, &LogVolumeName);
+//	if (!LogFileInstance)
+//	{
+//		goto CLEAN;
+//	}
+//	//以FILE_OVERWRITE_IF方式打开
+//	Status = FltCreateFile(
+//		g_minifilterHandle,
+//		LogFileInstance,
+//		&LogFileHandle,
+//		//&LogFileObject,
+//		FILE_APPEND_DATA | SYNCHRONIZE,
+//		&ObjectAttributes,
+//		&IoStatusBlock,
+//		NULL,
+//		FILE_ATTRIBUTE_NORMAL,
+//		FILE_SHARE_READ | FILE_SHARE_WRITE,
+//		FILE_OPEN_IF,
+//		FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+//		NULL,
+//		NULL,
+//		NULL);
+//	if (!NT_SUCCESS(Status))
+//	{
+//		DbgPrint("Open source file fault !! - %#x\n", Status);
+//		goto CLEAN;
+//	}
+//
+//	Status = ObReferenceObjectByHandle(LogFileHandle, 0, NULL, KernelMode, &LogFileObject, NULL);
+//
+//	if (!NT_SUCCESS(Status))
+//	{
+//		goto CLEAN;
+//	}
+//
+//	PWCHAR Buffer = (PWCHAR)ExAllocatePoolWithTag(NonPagedPool, 300, 'LogD');
+//	if (NULL == Buffer)
+//	{
+//		goto CLEAN;
+//	}
+//	UNICODE_STRING debugStr = { 0 };
+//	LPCWSTR pszFormat = L"################# Trying to get stream context (FileObject = %p, Instance = %p)\n";
+//
+//	RtlInitEmptyUnicodeString(&debugStr, Buffer, 300);
+//	//拷贝字符串
+//	Status = RtlUnicodeStringPrintf(&debugStr, pszFormat, arg1, arg2);
+//	if (!NT_SUCCESS(Status))
+//	{
+//		goto CLEAN;
+//	}
+//
+//
+//	FILE_STANDARD_INFORMATION fileInfo = { 0 };
+//	Status = FltQueryInformationFile(LogFileInstance, LogFileObject, &fileInfo, sizeof(fileInfo), FileStandardInformation, NULL);
+//	if (!NT_SUCCESS(Status))
+//	{
+//		goto CLEAN;
+//	}
+//
+//	//写入文件
+//	Status = FltWriteFile(
+//		LogFileInstance,
+//		LogFileObject,
+//		&fileInfo.EndOfFile,
+//		debugStr.Length,
+//		debugStr.Buffer,
+//		NULL,
+//		NULL,
+//		NULL,
+//		NULL);
+//	if (!NT_SUCCESS(Status))
+//	{
+//		DbgPrint("写入源文件失败!!\n - %#X", Status);
+//	}
+//	else
+//	{
+//		Offset.QuadPart += debugStr.Length;
+//	}
+//CLEAN:
+//	if (LogVolumeName.Buffer)
+//	{
+//		ExFreePool(LogVolumeName.Buffer);
+//		LogVolumeName.Buffer = NULL;
+//	}
+//	if (LogFileObject)
+//	{
+//		ObDereferenceObject(LogFileObject);
+//	}
+//	if (LogFileHandle)
+//	{
+//		FltClose(LogFileHandle);
+//	}
+//	if (LogFileInstance)
+//	{
+//		FltObjectDereference(LogFileInstance);
+//	}
+//	if (LogVolume)
+//	{
+//		FltObjectDereference(LogVolume);
+//	}
+//	//ExReleaseResourceAndLeaveCriticalRegion(&LogResource);
+//	return Status;
+//}
