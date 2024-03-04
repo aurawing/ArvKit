@@ -45,6 +45,7 @@ typedef struct _OpRule {
 	PWSTR pubKey;
 	PZPWSTR paths;
 	BOOL *isDB;
+	BOOL *blockExe;
 	UINT pathsLen;
 } OpRule, *POpRule;
 

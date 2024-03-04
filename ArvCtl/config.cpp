@@ -312,6 +312,7 @@ BOOL ConfigArvFilter()
 	cJSON *pJsonPathItem;
 	cJSON *pJsonPath;
 	cJSON *pJsonIsDB;
+	cJSON *pJsonBlockExe;
 	POpRule pRule;
 	POpRule *pzpRules;
 	HRESULT result = S_OK;
@@ -331,16 +332,29 @@ BOOL ConfigArvFilter()
 			pRule->pathsLen = pathLen;
 			pRule->paths = (PZPWSTR)malloc(pathLen * sizeof(PWSTR));
 			pRule->isDB = (BOOL*)malloc(pathLen * sizeof(BOOL));
+			pRule->blockExe = (BOOL*)malloc(pathLen * sizeof(BOOL));
 			for (int j = 0; j < pathLen; j++)
 			{
 				pJsonPathItem = cJSON_GetArrayItem(pJsonRuleItem, j);
 				pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 				pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+				pJsonBlockExe = cJSON_GetObjectItem(pJsonPathItem, "blockexe");
 				UTF8ToUnicode(pJsonPath->valuestring, &pRule->paths[j]);
 				if (cJSON_IsTrue(pJsonIsDB))
 					pRule->isDB[j] = TRUE;
 				else if (cJSON_IsFalse(pJsonIsDB))
 					pRule->isDB[j] = FALSE;
+				if (pJsonBlockExe == NULL)
+				{
+					pRule->blockExe[j] = FALSE;
+				}
+				else
+				{
+					if (cJSON_IsTrue(pJsonBlockExe))
+						pRule->blockExe[j] = TRUE;
+					else if (cJSON_IsFalse(pJsonBlockExe))
+						pRule->blockExe[j] = FALSE;
+				}
 			}
 			pzpRules[i] = pRule;
 		}
@@ -397,6 +411,7 @@ BOOL UpdateConfigs(PSaveRulesParam params, UINT dataLen)
 			cJSON *innerItem = cJSON_CreateObject();
 			cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(params[i].paths[j]));
 			cJSON_AddItemToObject(innerItem, "crypt", cJSON_CreateBool(params[i].isDBs[j]));
+			cJSON_AddItemToObject(innerItem, "blockexe", cJSON_CreateBool(params[i].blockExe[j]));
 			cJSON_AddItemToArray(pathItem, innerItem);
 		}
 
@@ -412,7 +427,7 @@ BOOL UpdateConfigs(PSaveRulesParam params, UINT dataLen)
 	return ConfigArvFilter();
 }
 
-BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen)
+BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, BOOL *blockExe, UINT pathLen)
 {
 	AcquireSRWLockExclusive(&configLock);
 	if (jsonConfig == NULL)
@@ -441,6 +456,7 @@ BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UIN
 		cJSON *innerItem = cJSON_CreateObject();
 		cJSON_AddItemToObject(innerItem, "path", cJSON_CreateString(paths[j]));
 		cJSON_AddItemToObject(innerItem, "crypt", cJSON_CreateBool(isDBs[j]));
+		cJSON_AddItemToObject(innerItem, "blockexe", cJSON_CreateBool(blockExe[j]));
 		cJSON_AddItemToArray(pathItem, innerItem);
 	}
 

@@ -15,6 +15,7 @@ typedef struct _PathEntry {
 	LIST_ENTRY entry;
 	UNICODE_STRING Path;
 	BOOL isDB;
+	BOOL blockExe;
 	PathStat stat;
 
 } PathEntry, *PPathEntry;
@@ -98,7 +99,7 @@ typedef struct _AbnormalCounters {
 } AbnormalCounters, *PAbnormalCounters;
 
 VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig);
-PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen);
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, BOOL *blockExe, UINT pathsLen);
 //BOOL ArvMapRule(PFilterConfig pFilterConfig, ULONG procID, BOOL inherit, UINT ruleID);
 //BOOL ArvRemoveProc(PFilterConfig pFilterConfig, ULONG procID, UINT ruleID);
 //VOID ArvRemoveProcEx(PFilterConfig pFilterConfig, ULONG procID);

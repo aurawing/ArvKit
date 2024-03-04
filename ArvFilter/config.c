@@ -8,7 +8,7 @@ VOID ArvInitializeFilterConfig(PFilterConfig pFilterConfig)
 	InitializeListHead(&pFilterConfig->ExeAllowedPath);
 }
 
-PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, UINT pathsLen)
+PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWSTR paths, BOOL *isDBs, BOOL *blockExe, UINT pathsLen)
 {
 	PRuleEntry pRuleEntry = (PRuleEntry)ExAllocatePoolWithTag(NonPagedPool, sizeof(RuleEntry), 'RLE');
 	RtlZeroMemory(pRuleEntry, sizeof(RuleEntry));
@@ -34,6 +34,7 @@ PRuleEntry ArvAddRule(PFilterConfig pFilterConfig, UINT id, PWSTR pubKey, PZPWST
 		}
 		pPathEntry->Path.Length = pPathEntry->Path.MaximumLength = (USHORT)pathLen * sizeof(wchar_t);
 		pPathEntry->isDB = isDBs[j];
+		pPathEntry->blockExe = blockExe[j];
 		InsertTailList(&pRuleEntry->Dirs, &pPathEntry->entry);
 	}
 	InsertTailList(&pFilterConfig->Rules, &pRuleEntry->entry);

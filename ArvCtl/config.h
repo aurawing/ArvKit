@@ -14,6 +14,7 @@ typedef struct _SaveRulesParam {
 	PSTR pubkey;
 	PZPSTR paths;
 	BOOL *isDBs;
+	BOOL *blockExe;
 	UINT pathLen;
 } SaveRulesParam, *PSaveRulesParam;
 
@@ -33,7 +34,7 @@ BOOL ConfigRegProcs();
 BOOL ConfigExeAllowedPath();
 BOOL ConfigArvFilter();
 BOOL UpdateConfigs(PSaveRulesParam params, UINT dataLen);
-BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, UINT pathLen);
+BOOL UpdateConfig(UINT id, PSTR pubkey, PSTR url, PZPSTR paths, BOOL *isDBs, BOOL *blockExe, UINT pathLen);
 BOOL UpdateDBPath(UINT id, PSTR path, BOOL isDB);
 PSTR LoadDBConf();
 

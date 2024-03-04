@@ -145,12 +145,20 @@ void process(WFHttpTask *server_task)
 						memset(paths, 0, pathLen * sizeof(PSTR));
 						BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
 						memset(isDBs, 0, pathLen * sizeof(BOOL));
+						BOOL *blockExe = (BOOL*)malloc(pathLen * sizeof(BOOL));
+						memset(blockExe, 0, pathLen * sizeof(BOOL));
 						for (int j = 0; j < pathLen; j++)
 						{
 							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, j);
 							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+							cJSON *pJsonBlockExe = cJSON_GetObjectItem(pJsonPathItem, "blockexe");
 							if (pJsonPath == NULL || pJsonIsDB == NULL || pJsonPath->type != cJSON_String || (pJsonIsDB->type != cJSON_True && pJsonIsDB->type != cJSON_False))
+							{
+								succ = false;
+								goto OUTLOOP;
+							}
+							if (pJsonBlockExe != NULL && pJsonBlockExe->type != cJSON_True && pJsonBlockExe->type != cJSON_False)
 							{
 								succ = false;
 								goto OUTLOOP;
@@ -165,9 +173,21 @@ void process(WFHttpTask *server_task)
 								isDBs[j] = TRUE;
 							else if (cJSON_IsFalse(pJsonIsDB))
 								isDBs[j] = FALSE;
+							if (pJsonBlockExe == NULL)
+							{
+								blockExe[j] = FALSE;
+							} 
+							else
+							{
+								if (cJSON_IsTrue(pJsonBlockExe))
+									blockExe[j] = TRUE;
+								else if (cJSON_IsFalse(pJsonBlockExe))
+									blockExe[j] = FALSE;
+							}
 						}
 						params[i].paths = paths;
 						params[i].isDBs = isDBs;
+						params[i].blockExe = blockExe;
 						params[i].pathLen = pathLen;
 					}
 				OUTLOOP:
@@ -235,12 +255,19 @@ void process(WFHttpTask *server_task)
 						BOOL flag = TRUE;
 						PZPSTR paths = (PZPSTR)malloc(pathLen * sizeof(PSTR));
 						BOOL *isDBs = (BOOL*)malloc(pathLen * sizeof(BOOL));
+						BOOL *blockExe = (BOOL*)malloc(pathLen * sizeof(BOOL));
 						for (int i = 0; i < pathLen; i++)
 						{
 							cJSON *pJsonPathItem = cJSON_GetArrayItem(pathEntry, i);
 							cJSON *pJsonPath = cJSON_GetObjectItem(pJsonPathItem, "path");
 							cJSON *pJsonIsDB = cJSON_GetObjectItem(pJsonPathItem, "crypt");
+							cJSON *pJsonBlockExe = cJSON_GetObjectItem(pJsonPathItem, "blockexe");
 							if (pJsonPath == NULL || pJsonIsDB == NULL || pJsonPath->type != cJSON_String || (pJsonIsDB->type != cJSON_True && pJsonIsDB->type != cJSON_False))
+							{
+								flag = false;
+								break;
+							}
+							if (pJsonBlockExe != NULL && pJsonBlockExe->type != cJSON_True && pJsonBlockExe->type != cJSON_False)
 							{
 								flag = false;
 								break;
@@ -255,12 +282,24 @@ void process(WFHttpTask *server_task)
 								isDBs[i] = TRUE;
 							else if (cJSON_IsFalse(pJsonIsDB))
 								isDBs[i] = FALSE;
+							if (pJsonBlockExe == NULL)
+							{
+								blockExe[i] = FALSE;
+							}
+							else
+							{
+								if (cJSON_IsTrue(pJsonBlockExe))
+									blockExe[i] = TRUE;
+								else if (cJSON_IsFalse(pJsonBlockExe))
+									blockExe[i] = FALSE;
+							}
 						}
 						if (flag)
 						{
-							UpdateConfig(id, pubkey, urlStr, paths, isDBs, pathLen);
+							UpdateConfig(id, pubkey, urlStr, paths, isDBs, blockExe, pathLen);
 							free(paths);
 							free(isDBs);
+							free(blockExe);
 							user_resp->set_status_code("200");
 							char* jsonstr = PrintJsonConfig();
 							if (jsonstr != NULL)
@@ -279,6 +318,7 @@ void process(WFHttpTask *server_task)
 						{
 							free(paths);
 							free(isDBs);
+							free(blockExe);
 							user_resp->set_status_code("500");
 							user_resp->append_output_body("{\"code\": -21, \"msg\": \"path format error\", \"data\": {}}");
 						}

@@ -1057,6 +1057,23 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		}
 			//pListEntry = pListEntry->Flink;
 		//}
+
+		//TODO: 检查后缀是否是exe bat
+		if (flag && createDisposition==0 && pPathEntry && pPathEntry->blockExe)
+		{
+			UNICODE_STRING extensionExe = { 0 };
+			UNICODE_STRING extensionBat = { 0 };
+			RtlInitUnicodeString(&extensionExe, L".exe");
+			RtlInitUnicodeString(&extensionBat, L".bat");
+			UNICODE_STRING extension = { 0 };
+			extension.Length = extension.MaximumLength = 4 * sizeof(WCHAR);
+			extension.Buffer = &fullPath.Buffer[fullPath.Length/2 - 4];
+			if (RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0)
+			{
+				flag = FALSE;
+			}
+		}
+
 		if (ArvGetLogOnly() == 2)
 		{
 			flag = FALSE;
@@ -1670,6 +1687,20 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			}
 			//pListEntry = pListEntry->Flink;
 		//}
+		}
+		if (flag && pPathEntry && pPathEntry->blockExe)
+		{
+			UNICODE_STRING extensionExe = { 0 };
+			UNICODE_STRING extensionBat = { 0 };
+			RtlInitUnicodeString(&extensionExe, L".exe");
+			RtlInitUnicodeString(&extensionBat, L".bat");
+			UNICODE_STRING extension = { 0 };
+			extension.Length = extension.MaximumLength = 4 * sizeof(WCHAR);
+			extension.Buffer = &fullPath.Buffer[fullPath.Length / 2 - 4];
+			if (RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0)
+			{
+				flag = FALSE;
+			}
 		}
 	out1:
 		if (flag)

@@ -200,7 +200,7 @@ MiniMessage(
 				controlProcID = pOpSetRules->controlProcID;
 				for (UINT i = 0; i < pOpSetRules->ruleLen; i++)
 				{
-					PRuleEntry newRuleEntry = ArvAddRule(&tmpConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->isDB, pOpSetRules->rules[i]->pathsLen);
+					PRuleEntry newRuleEntry = ArvAddRule(&tmpConfig, pOpSetRules->rules[i]->id, pOpSetRules->rules[i]->pubKey, pOpSetRules->rules[i]->paths, pOpSetRules->rules[i]->isDB, pOpSetRules->rules[i]->blockExe, pOpSetRules->rules[i]->pathsLen);
 
 					PLIST_ENTRY pListEntry = filterConfig.Rules.Flink;
 					while (pListEntry != &filterConfig.Rules)

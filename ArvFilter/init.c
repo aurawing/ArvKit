@@ -1956,7 +1956,7 @@ NTSTATUS ArvWriteLogEx(PCWSTR type, PUNICODE_STRING path, PLIST_ENTRY pProcHead,
 	UNICODE_STRING procIDStr;
 	RtlInitEmptyUnicodeString(&procIDStr, intbuf, 20);
 	RtlIntegerToUnicodeString(procID, 10, &procIDStr);
-	RtlAppendUnicodeToString(&String, L",\"F\":");
+	RtlAppendUnicodeToString(&String, L"\",\"F\":");
 	RtlAppendUnicodeStringToString(&String, &procIDStr);
 
 	RtlAppendUnicodeToString(&String, L"}\r\n");
