@@ -369,6 +369,7 @@ BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path)
 			path->Length = fpLen;
 			if (path->Length >= sizeof(WCHAR) * 4)
 			{
+				UNICODE_STRING usBatBuffer = RTL_CONSTANT_STRING(L".bat");
 				UNICODE_STRING usExeBuffer = RTL_CONSTANT_STRING(L".exe");
 				UNICODE_STRING usDllBuffer = RTL_CONSTANT_STRING(L".dll");
 				UNICODE_STRING usJarBuffer = RTL_CONSTANT_STRING(L".jar");
@@ -378,7 +379,7 @@ BOOL ArvIfExeAllowedPath(PFilterConfig pFilterConfig, PUNICODE_STRING path)
 				RtlCopyMemory(szBuffer, pBuffer, sizeof(WCHAR) * 4);
 				RtlInitUnicodeString(&usImageExtBuffer, szBuffer);
 				usImageExtBuffer.Length = usImageExtBuffer.MaximumLength = sizeof(WCHAR) * 4;
-				if (RtlEqualUnicodeString(&usExeBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usDllBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usJarBuffer, &usImageExtBuffer, true))
+				if (RtlEqualUnicodeString(&usBatBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usExeBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usDllBuffer, &usImageExtBuffer, true) || RtlEqualUnicodeString(&usJarBuffer, &usImageExtBuffer, true))
 				{
 					ret = TRUE;
 					break;

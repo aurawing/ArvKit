@@ -63,6 +63,7 @@
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
     <RootNamespace>ArvFilter</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -184,6 +185,9 @@
       <WppTraceFunction>
       </WppTraceFunction>
     </ClCompile>
+    <DriverSign>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
@@ -195,6 +199,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)\ArvFilter\libsecp256k1\src;$(SolutionDir)\ArvFilter\libsecp256k1\include;$(SolutionDir)\ArvFilter\libsha256;$(SolutionDir)\ArvFilter\libbase58;$(SolutionDir)\ArvFilter\libripemd160;$(VCToolsInstallDir)include;$(UniversalCRT_IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;ECMULT_GEN_PREC_BITS=4;ECMULT_WINDOW_SIZE=15;ENABLE_MODULE_ECDH=1;ENABLE_MODULE_RECOVERY=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <DriverSign>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>

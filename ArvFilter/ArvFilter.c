@@ -1059,7 +1059,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//}
 
 		//TODO: 检查后缀是否是exe bat
-		if (flag && createDisposition==0 && pPathEntry && pPathEntry->blockExe)
+		if (flag && createDisposition==1 && pPathEntry && pPathEntry->blockExe)
 		{
 			UNICODE_STRING extensionExe = { 0 };
 			UNICODE_STRING extensionBat = { 0 };
@@ -1068,7 +1068,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			UNICODE_STRING extension = { 0 };
 			extension.Length = extension.MaximumLength = 4 * sizeof(WCHAR);
 			extension.Buffer = &fullPath.Buffer[fullPath.Length/2 - 4];
-			if (RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0)
+			if (RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0)
 			{
 				flag = FALSE;
 			}
@@ -1697,7 +1697,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationSetInfo(
 			UNICODE_STRING extension = { 0 };
 			extension.Length = extension.MaximumLength = 4 * sizeof(WCHAR);
 			extension.Buffer = &fullPath.Buffer[fullPath.Length / 2 - 4];
-			if (RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0)
+			if (RtlCompareUnicodeString(&extension, &extensionBat, TRUE) == 0 || RtlCompareUnicodeString(&extension, &extensionExe, TRUE) == 0)
 			{
 				flag = FALSE;
 			}
