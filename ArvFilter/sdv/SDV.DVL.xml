@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<Data> 
+<AssessmentScore ScoreName="ArvFilter.x64.General.XMLTimeStamp" ScoreValue="0" ScoreUnit="09/13/2022 13:48:07" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.DriverBinary" ScoreValue="0" ScoreUnit="ArvFilter.sys" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.BinaryTimeStamp" ScoreValue="0" ScoreUnit="01/01/1601 08:00:00" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.DriverType" ScoreValue="0" ScoreUnit="generic" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.DriverSize" ScoreValue="181" ScoreUnit="LOC" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.DriverVersion" ScoreValue="0" ScoreUnit="0" />
+<AssessmentScore ScoreName="ArvFilter.x64.General.Libs" ScoreValue="0" ScoreUnit="Number of external libraries used" />
+<AssessmentScore ScoreName="ArvFilter.x64.SDV.Version" ScoreValue="0" ScoreUnit="sdv-15-02-2018" />
+<AssessmentScore ScoreName="ArvFilter.x64.SDV.ActiveRuleTotal" ScoreValue="3" ScoreUnit="Total rules available" />
+<AssessmentScore ScoreName="ArvFilter.x64.SDV.Rule.nullcheck" ScoreValue="1" ScoreUnit="SDV_FAILED" />
+<AssessmentScore ScoreName="ArvFilter.x64.SDV.Rule.useafterfree" ScoreValue="3" ScoreUnit="SDV_TIMEOUT" />
+<AssessmentScore ScoreName="ArvFilter.x64.SDV.Rule.checkirql" ScoreValue="0" ScoreUnit="SDV_PASSED" />
+</Data>

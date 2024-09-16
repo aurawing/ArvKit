@@ -1,0 +1,253 @@
+Running EngineQ (akashl-7-9-2014)
+Alias Analysis: 0.0009995 s
+Running PropInst with: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\corral\..\Corral\PropInst.exe local_checkirql.avp test.bpl test_inst.bpl
+Running FastAvn: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\corral\..\Corral\FastAvn.exe  test_inst.bpl   /hopt:useEntryPoints /hopt:unknownType:IrqlType /hopt:unknownType:int /hopt:unknownProc:__HAVOC_malloc /aopt:sdv /aopt:blockOnFreeVars /aopt:timeout:100 /aopt:noEbasic /aopt:EE:ignoreAllAssumes+ /aopt:dontGeneralize /aopt:EE:dontDisplayComparisonsWithConsts- /aopt:EE:onlyDisplayAliasingInPre- /killAfter:4500 /aopt:recordVar:irql_current /aopt:copt:recursionBound:10 /aopt:timeoutEE:50 /numThreads:7 
+[TAG: AV_DEBUG] Found AngelicVerifierNull.exe at: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\Corral\AngelicVerifierNull.exe
+[TAG: AV_DEBUG] Found AvHarnessInstrumentation.exe at: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\Corral\AvHarnessInstrumentation.exe
+[TAG: AV_OUTPUT] ----- Run FastAVN on test_inst.bpl with k=-1 ------
+[hinst] [TAG: AV_STATS] #Procs : 349
+[hinst] [TAG: AV_STATS] #EntryPoints : 117
+[hinst] [TAG: AV_STATS] #AssertsBeforeAA : 28
+[hinst] Running alias analysis
+[hinst] Using global value numbering
+[hinst] AA: Cycle elimination found 0 cycles
+[hinst] Pruning away 44 entry points as they cannot reach an assert
+[hinst] [TAG: AV_STATS] #AssertsAfterAA : 23
+[hinst] [TAG: AV_STATS] *************** STATS ***************
+[hinst] [TAG: AV_STATS] gvn(s) : 1.4370994
+[hinst] [TAG: AV_STATS] read.write(s) : 2.6168009
+[hinst] [TAG: AV_STATS] ssa(s) : 0.6010668
+[hinst] [TAG: AV_STATS] fixpoint(s) : 0.9310713
+[hinst] [TAG: AV_STATS] alias.analysis(s) : 8.1348257
+[hinst] [TAG: AV_STATS] *************************************
+[hinst] [TAG: AV_STATS] TotalTime(ms) : 18046
+[hinst] 
+Running entrypoint XBFltGetVolumeInstance locally {
+Running entrypoint ArvWriteLog locally {
+Running entrypoint ProcAllowed2 locally {
+Running entrypoint ArvSetDBConf locally {
+Running entrypoint ProcAllowed locally {
+Running entrypoint ArvFreeProcs locally {
+Running entrypoint ArvProcessFlagFind locally {
+Running entrypoint ArvProcessFlagFind }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFreeUnicodeString locally {
+Running entrypoint ArvFreeProcs }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvSetDBConf }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint XBFltGetVolumeInstance }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvAddRegProc locally {
+Running entrypoint ArvProcessFlagDelete locally {
+Running entrypoint ArvWriteLog }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvProcessFlagRelease locally {
+Running entrypoint ArvAddRuleEntry2 locally {
+Running entrypoint ArvFreeUnicodeString }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFreeRegProcs locally {
+Running entrypoint ProcAllowed2 }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvProcessFlagRelease }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvAddProc locally {
+Running entrypoint ArvAddRegProc }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvAddRuleEntry2 }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFreeRule locally {
+Running entrypoint ArvProcessFlagDelete }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFreeRegProc locally {
+Running entrypoint ProcAllowed }
+Running entrypoint ArvFreeRegProcs }
+Running entrypoint ArvAddProc }
+[TAG: AV_DEBUG] Bugs found so far: 0
+[TAG: AV_DEBUG] Bugs found so far: 0
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvProcessFlagAdd locally {
+Running entrypoint ArvProcessFlagInit locally {
+Running entrypoint ArvAddRule locally {
+Running entrypoint ArvFreeRules locally {
+Running entrypoint ArvFreeRuleEntry2 locally {
+Running entrypoint ArvFreeRule }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFreeRegProc }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint CtxFindOrCreateStreamContext locally {
+Running entrypoint CtxStreamContextCleanup locally {
+Running entrypoint ArvProcessFlagInit }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint CtxVolumeContextCleanup locally {
+Running entrypoint ArvFreeRuleEntry2 }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint CtxCreateStreamContext locally {
+Running entrypoint ArvFreeRules }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvGetFileNameOrExtension locally {
+Running entrypoint ArvAddRule }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFlushOriginalCache locally {
+Running entrypoint ArvProcessFlagAdd }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvNtfsFlushAndPurgeCache locally {
+Running entrypoint CtxFindOrCreateStreamContext }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvKdeferredRoutine locally {
+Running entrypoint ArvGetFileNameOrExtension }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint CtxVolumeContextCleanup }
+Running entrypoint CtxCreateStreamContext }
+[TAG: AV_DEBUG] Bugs found so far: 0
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvInitDpcRoutine locally {
+Running entrypoint ArvSafePostCallbackShell locally {
+Running entrypoint ArvDoCompletionProcessingWhenSafe locally {
+Running entrypoint ArvNtfsFlushAndPurgeCache }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvWorkItemListCleanup locally {
+Running entrypoint CtxStreamContextCleanup }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint MiniMessage locally {
+Running entrypoint ArvKdeferredRoutine }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFlushOriginalCache }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_seckey_negate locally {
+Running entrypoint RecoveryRegProcs locally {
+Running entrypoint ArvInitDpcRoutine }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_preallocated_clone locally {
+Running entrypoint ArvWorkItemListCleanup }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_scratch_space_destroy locally {
+Running entrypoint secp256k1_ec_seckey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_destroy locally {
+Running entrypoint secp256k1_context_preallocated_clone }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint RecoveryRegProcs }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_serialize_der locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_add locally {
+Running entrypoint secp256k1_ecdsa_signature_serialize_der }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_parse_compact locally {
+Running entrypoint secp256k1_context_destroy }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_combine locally {
+Running entrypoint MiniMessage }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_preallocated_create locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvSafePostCallbackShell }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_scratch_space_destroy }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_seckey_tweak_mul locally {
+Running entrypoint secp256k1_ec_seckey_tweak_add locally {
+Running entrypoint secp256k1_pubkey_load_sdv_static_function_1 locally {
+Running entrypoint secp256k1_ecdsa_signature_parse_compact }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_preallocated_size locally {
+Running entrypoint secp256k1_ec_pubkey_combine }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_parse locally {
+Running entrypoint ArvDoCompletionProcessingWhenSafe }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_privkey_tweak_add locally {
+Running entrypoint secp256k1_ec_seckey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_pubkey_load_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_parse_der locally {
+Running entrypoint secp256k1_scratch_space_create locally {
+Running entrypoint secp256k1_ec_seckey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_preallocated_destroy locally {
+Running entrypoint secp256k1_context_preallocated_size }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_cmp locally {
+Running entrypoint secp256k1_ecdsa_signature_parse_der }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_tagged_sha256 locally {
+Running entrypoint secp256k1_ec_pubkey_parse }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_serialize locally {
+Running entrypoint secp256k1_scratch_space_create }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_privkey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_normalize locally {
+Running entrypoint secp256k1_context_set_error_callback locally {
+Running entrypoint secp256k1_context_preallocated_destroy }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_preallocated_create }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_serialize_compact locally {
+Running entrypoint secp256k1_ec_privkey_negate locally {
+Running entrypoint secp256k1_tagged_sha256 }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_verify locally {
+Running entrypoint secp256k1_ec_pubkey_serialize }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_signature_normalize }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_set_error_callback }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_set_illegal_callback locally {
+Running entrypoint secp256k1_context_create locally {
+Running entrypoint secp256k1_ec_pubkey_negate locally {
+Running entrypoint secp256k1_ecdsa_signature_serialize_compact }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_privkey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_cmp }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_privkey_tweak_mul locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_mul locally {
+Running entrypoint secp256k1_ecdsa_sign locally {
+Running entrypoint secp256k1_context_set_illegal_callback }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_clone locally {
+Running entrypoint secp256k1_ec_pubkey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_seckey_verify locally {
+Running entrypoint secp256k1_ecdsa_verify }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_create locally {
+Running entrypoint secp256k1_ec_privkey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ecdsa_sign }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFindSubString locally {
+Running entrypoint ArvQueryEndOfFileInfo locally {
+Running entrypoint ArvQueryVolumeSectorSize locally {
+Running entrypoint secp256k1_ec_seckey_verify }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_clone }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_ec_pubkey_create }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint secp256k1_context_create }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvFindSubString }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvQueryEndOfFileInfo }
+[TAG: AV_DEBUG] Bugs found so far: 0
+Running entrypoint ArvQueryVolumeSectorSize }
+[TAG: AV_DEBUG] Bugs found so far: 0
+[TAG: AV_OUTPUT] ========= Merged Bugs for 73 Entry Points =========
+[TAG: AV_OUTPUT] Description,Src File,Line,Procedure,Fail Status
+[TAG: AV_STATS] *************** STATS ***************
+[TAG: AV_STATS] fastavn(s) : 1017.1283452
+[TAG: AV_STATS] impl.count : 288
+[TAG: AV_STATS] #EntryPoints : 73
+[TAG: AV_STATS] *************************************
+
+EngineQ: 0 bugs found
+Done

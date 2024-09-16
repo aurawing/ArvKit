@@ -1,0 +1,6 @@
+Driver is entered:
+[config.c@306]            ArvAddRegProc calls ExAllocatePoolWithTag
+[config.c@307]            ArvAddRegProc calls sdv_RtlZeroMemory
+[config.c@308]            ArvAddRegProc calls ExAllocatePoolWithTag
+[config.c@309]            ArvAddRegProc calls sdv_RtlCopyMemory
+Error 

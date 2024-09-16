@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<RuleResult xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <bugPath>nullcheck\bug1</bugPath>
+  <defect>true</defect>
+  <Name>nullcheck</Name>
+  <Result>SDV_FAILED</Result>
+  <IsPreCondition>false</IsPreCondition>
+  <IsMustFix>false</IsMustFix>
+  <isWarning>false</isWarning>
+</RuleResult>

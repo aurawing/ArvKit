@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<RuleResult xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <defect>false</defect>
+  <Name>useafterfree</Name>
+  <Result>SDV_TIMEOUT</Result>
+  <IsPreCondition>false</IsPreCondition>
+  <IsMustFix>false</IsMustFix>
+  <isWarning>true</isWarning>
+</RuleResult>

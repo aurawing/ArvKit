@@ -1,0 +1,86 @@
+0 "?" 0 false ^ Call "OS" "main"
+1 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+2 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+3 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+4 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+5 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+6 "d:\vsprojects\arvkit\arvfilter\init.c" 268 true ^ProcID=386_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+7 "d:\vsprojects\arvkit\arvfilter\init.c" 268 true ^arg1=386^arg2=3651_sdvRelevantTraceLine_^====Auto===== Atomic Continuation
+8 "d:\vsprojects\arvkit\arvfilter\init.c" 269 true ^ntStatus=2699_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+9 "d:\vsprojects\arvkit\arvfilter\init.c" 276 true ^arg1=0^arg2=512^arg3=1397965382_sdvRelevantTraceLine_^====Auto===== Call "ProcAllowed2" "ExAllocatePoolWithTag"
+10 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+11 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+12 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7366 true ^PoolType=0_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+13 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7369 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+14 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7375 true _sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+15 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+16 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7377 true _sdvIrrelevantTraceLine_^====Auto===== Return
+17 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+18 "d:\vsprojects\arvkit\arvfilter\init.c" 276 true ^sdv=0_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+19 "d:\vsprojects\arvkit\arvfilter\init.c" 277 true ^arg1=3659^arg2=0^arg3=512_sdvRelevantTraceLine_^====Auto===== Call "ProcAllowed2" "RtlInitEmptyUnicodeString"
+20 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+21 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+22 "c:\program files (x86)\windows kits\10\include\10.0.17763.0\km\wdm.h" 12089 true ^BufferSize=512_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+23 "c:\program files (x86)\windows kits\10\include\10.0.17763.0\km\wdm.h" 12090 true ^Buffer=0_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+24 "c:\program files (x86)\windows kits\10\include\10.0.17763.0\km\wdm.h" 12091 true _sdvIrrelevantTraceLine_^====Auto===== Return
+25 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+26 "d:\vsprojects\arvkit\arvfilter\init.c" 280 true ^arg1=3671_sdvIrrelevantTraceLine_^====Auto===== Call "ProcAllowed2" "PsReferencePrimaryToken"
+27 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+28 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+29 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 15073 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+30 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 15073 true ^sdv=3679_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+31 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 15073 true _sdvIrrelevantTraceLine_^====Auto===== Return
+32 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+33 "d:\vsprojects\arvkit\arvfilter\init.c" 281 true ^arg1=3671_sdvIrrelevantTraceLine_^====Auto===== Call "ProcAllowed2" "sdv_ObDereferenceObject"
+34 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+35 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+36 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14337 true ^sdv=404_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+37 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14338 true ^p=404_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+38 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14338 true _sdvIrrelevantTraceLine_^====Auto===== Return
+39 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+40 "d:\vsprojects\arvkit\arvfilter\init.c" 282 true ^arg1=3679^arg2=0^arg3=0^arg4=8^arg5=0^arg6=0^arg7=3655_sdvRelevantTraceLine_^====Auto===== Atomic Continuation
+41 "d:\vsprojects\arvkit\arvfilter\init.c" 284 true ^arg1=3679_sdvIrrelevantTraceLine_^====Auto===== Call "ProcAllowed2" "sdv_ObDereferenceObject"
+42 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+43 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+44 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14337 true ^sdv=405_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+45 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14338 true ^p=405_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+46 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 14338 true _sdvIrrelevantTraceLine_^====Auto===== Return
+47 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+48 "d:\vsprojects\arvkit\arvfilter\init.c" 285 true ^ntStatus=4321_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+49 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+50 "?" 0 true ^requiredLength=2061_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+51 "d:\vsprojects\arvkit\arvfilter\init.c" 295 true ^arg1=3680^arg2=1^arg3=0^arg4=0^arg5=3684_sdvRelevantTraceLine_^====Auto===== Atomic Continuation
+52 "?" 0 true ^*Tmp=2061_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+53 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+54 "d:\vsprojects\arvkit\arvfilter\init.c" 297 true ^ntStatus=-1073741789_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+55 "d:\vsprojects\arvkit\arvfilter\init.c" 305 true ^requiredLength=2061_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+56 "d:\vsprojects\arvkit\arvfilter\init.c" 304 true ^arg1=0^arg2=2061^arg3=1414223186_sdvRelevantTraceLine_^====Auto===== Call "ProcAllowed2" "ExAllocatePoolWithTag"
+57 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+58 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+59 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7366 true ^PoolType=0_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+60 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7369 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+61 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7372 true ^NumberOfBytes=2061_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+62 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7372 true ^Tmp=2061_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+63 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7372 true ^sdv=3688_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+64 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+65 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7377 true _sdvIrrelevantTraceLine_^====Auto===== Return
+66 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+67 "d:\vsprojects\arvkit\arvfilter\init.c" 304 true ^sdv=3688_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+68 "d:\vsprojects\arvkit\arvfilter\init.c" 306 true ^tokenInfoBuffer=3688_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+69 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+70 "?" 0 true ^requiredLength=2061_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+71 "d:\vsprojects\arvkit\arvfilter\init.c" 307 true ^arg1=3680^arg2=1^arg3=3688^arg4=2061^arg5=5749_sdvRelevantTraceLine_^====Auto===== Atomic Continuation
+72 "?" 0 true ^*Tmp=2061_sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+73 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+74 "d:\vsprojects\arvkit\arvfilter\init.c" 310 true ^ntStatus=213_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+75 "d:\vsprojects\arvkit\arvfilter\init.c" 310 true ^tokenInfoBuffer=3688_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+76 "d:\vsprojects\arvkit\arvfilter\init.c" 321 true ^arg1=3680_sdvIrrelevantTraceLine_^====Auto===== Call "ProcAllowed2" "ZwClose"
+77 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+78 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+79 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 16264 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Assignment
+80 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 16264 true _sdvIrrelevantTraceLine_^====Auto===== Return
+81 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+82 "d:\vsprojects\arvkit\arvfilter\init.c" 331 true ^arg1=3659^arg2=3565^arg3=0_sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+83 "d:\vsprojects\arvkit\arvfilter\init.c" 333 true ^sidString.Length=941_sdvRelevantTraceLine__sdvNotMustFailLocation_^====Auto===== Atomic Assignment
+84 "d:\vsprojects\arvkit\arvfilter\init.c" 333 true _sdvRelevantTraceLine__sdvNotMustFailLocation_^====Auto===== Atomic Assignment
+Error 

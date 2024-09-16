@@ -1,0 +1,5 @@
+Driver is entered:
+[config.c@12]             ArvAddRule calls ExAllocatePoolWithTag
+[config.c@13]             ArvAddRule calls sdv_RtlZeroMemory
+[config.c@16]             ArvAddRule calls ExAllocatePoolWithTag
+Error 

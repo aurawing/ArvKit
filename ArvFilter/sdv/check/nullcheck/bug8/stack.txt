@@ -1,0 +1,9 @@
+Driver is entered:
+[init.c@276]              ProcAllowed2 calls ExAllocatePoolWithTag
+[init.c@277]              ProcAllowed2 calls RtlInitEmptyUnicodeString
+[init.c@280]              ProcAllowed2 calls PsReferencePrimaryToken
+[init.c@281]              ProcAllowed2 calls sdv_ObDereferenceObject
+[init.c@284]              ProcAllowed2 calls sdv_ObDereferenceObject
+[init.c@304]              ProcAllowed2 calls ExAllocatePoolWithTag
+[init.c@321]              ProcAllowed2 calls ZwClose
+Error 

@@ -1,0 +1,225 @@
+Running EngineQ (akashl-7-9-2014)
+Alias Analysis: 2.5295288 s
+Running FastAvn: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\corral\..\Corral\FastAvn.exe test.bpl   /hopt:useEntryPoints /hopt:unknownProc:__HAVOC_malloc /aopt:sdv /aopt:blockOnFreeVars /aopt:timeout:100 /aopt:noEbasic /aopt:EE:ignoreAllAssumes+ /aopt:dontGeneralize /aopt:EE:dontDisplayComparisonsWithConsts+  /aopt:traceSlicing  /numThreads:7  /killAfter:2940 
+[TAG: AV_DEBUG] Found AngelicVerifierNull.exe at: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\Corral\AngelicVerifierNull.exe
+[TAG: AV_DEBUG] Found AvHarnessInstrumentation.exe at: C:\Program Files (x86)\Windows Kits\10\TOOLS\SDV\bin\engine\engineq\Corral\AvHarnessInstrumentation.exe
+[TAG: AV_OUTPUT] ----- Run FastAVN on test.bpl with k=-1 ------
+[hinst] [TAG: AV_STATS] #Procs : 349
+[hinst] [TAG: AV_STATS] #EntryPoints : 117
+[hinst] [TAG: AV_STATS] #AssertsBeforeAA : 4802
+[hinst] Running alias analysis
+[hinst] Using global value numbering
+[hinst] AA: Cycle elimination found 0 cycles
+[hinst] Pruning away 59 entry points as they cannot reach an assert
+[hinst] [TAG: AV_STATS] #AssertsAfterAA : 95
+[hinst] [TAG: AV_STATS] *************** STATS ***************
+[hinst] [TAG: AV_STATS] gvn(s) : 0.887078
+[hinst] [TAG: AV_STATS] read.write(s) : 2.8348128
+[hinst] [TAG: AV_STATS] ssa(s) : 0.9635795
+[hinst] [TAG: AV_STATS] fixpoint(s) : 0.7800576
+[hinst] [TAG: AV_STATS] alias.analysis(s) : 7.4867824
+[hinst] [TAG: AV_STATS] *************************************
+[hinst] [TAG: AV_STATS] TotalTime(ms) : 17852
+[hinst] 
+Running entrypoint ArvProcessFlagFind locally {
+Running entrypoint ArvFreeProcs locally {
+Running entrypoint sha256_update locally {
+Running entrypoint ArvGetRuleIDByRegProcName locally {
+Running entrypoint ProcAllowed2 locally {
+Running entrypoint ArvSetDBConf locally {
+Running entrypoint Sha256UnicodeString locally {
+Running entrypoint ProcAllowed2 }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvProcessFlagDelete locally {
+Running entrypoint sha256_update }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvAddRegProc locally {
+Running entrypoint Sha256UnicodeString }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvProcessFlagRelease locally {
+Running entrypoint ArvGetRuleIDByRegProcName }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvAddRuleEntry2 locally {
+Running entrypoint ArvSetDBConf }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvFreeRegProcs locally {
+Running entrypoint ArvFreeProcs }
+[TAG: AV_DEBUG] Bugs found so far: 1
+Running entrypoint ArvAddProc locally {
+Running entrypoint ArvAddRuleEntry2 }
+[TAG: AV_DEBUG] Bugs found so far: 2
+Running entrypoint ArvFreeRegProc locally {
+Running entrypoint ArvAddRegProc }
+[TAG: AV_DEBUG] Bugs found so far: 3
+Running entrypoint ArvAddProc }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvGetPubKeyByRuleID locally {
+Running entrypoint ArvFreeRule locally {
+Running entrypoint ArvFreeRegProc }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvProcessFlagAdd locally {
+Running entrypoint ArvGetPubKeyByRuleID }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvProcessFlagDelete }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvGetRegProcEntryByRegProcName locally {
+Running entrypoint ArvFreeRules locally {
+Running entrypoint ArvProcessFlagRelease }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvGetRuleEntryByRuleID locally {
+Running entrypoint ArvFreeRule }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvGetRegProcEntryByRegProcName }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvAddRule locally {
+Running entrypoint ArvFreeRuleEntry2 locally {
+Running entrypoint ArvGetRuleEntryByRuleID }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvGetFileNameOrExtension locally {
+Running entrypoint ArvGetFileNameOrExtension }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvFlushOriginalCache locally {
+Running entrypoint ArvFlushOriginalCache }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvNtfsFlushAndPurgeCache locally {
+Running entrypoint ArvFreeRuleEntry2 }
+[TAG: AV_DEBUG] Bugs found so far: 4
+Running entrypoint ArvSafePostCallbackShell locally {
+Running entrypoint ArvProcessFlagAdd }
+[TAG: AV_DEBUG] Bugs found so far: 5
+Running entrypoint ArvNtfsFlushAndPurgeCache }
+[TAG: AV_DEBUG] Bugs found so far: 5
+Running entrypoint MiniMessage locally {
+Running entrypoint RecoveryRegProcs locally {
+Running entrypoint ArvAddRule }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint ArvSafePostCallbackShell }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_negate locally {
+Running entrypoint ArvFreeRules }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_scratch_space_destroy locally {
+Running entrypoint ArvProcessFlagFind }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_tweak_add_helper_sdv_static_function_1 locally {
+Running entrypoint secp256k1_ec_seckey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_create_helper_sdv_static_function_1 locally {
+Running entrypoint secp256k1_scratch_space_destroy }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_tweak_add locally {
+Running entrypoint secp256k1_ec_seckey_tweak_add_helper_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ecdsa_signature_serialize_der locally {
+Running entrypoint secp256k1_ec_pubkey_combine locally {
+Running entrypoint secp256k1_ecdsa_signature_serialize_der }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_context_preallocated_create locally {
+Running entrypoint secp256k1_ec_pubkey_combine }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_tweak_mul locally {
+Running entrypoint secp256k1_context_preallocated_create }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_tweak_add locally {
+Running entrypoint secp256k1_ec_pubkey_parse locally {
+Running entrypoint secp256k1_ec_seckey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint nonce_function_rfc6979_sdv_static_function_1 locally {
+Running entrypoint secp256k1_ec_pubkey_parse }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint nonce_function_rfc6979_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_tweak_add_helper_sdv_static_function_1 locally {
+Running entrypoint secp256k1_ec_privkey_tweak_add locally {
+Running entrypoint secp256k1_ec_privkey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_cmp locally {
+Running entrypoint secp256k1_ec_pubkey_cmp }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ecdsa_signature_normalize locally {
+Running entrypoint secp256k1_ecdsa_signature_normalize }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ecdsa_signature_serialize_compact locally {
+Running entrypoint secp256k1_ecdsa_signature_serialize_compact }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_privkey_negate locally {
+Running entrypoint secp256k1_ec_privkey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ecdsa_verify locally {
+Running entrypoint secp256k1_ecdsa_verify }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint RecoveryRegProcs }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_context_create locally {
+Running entrypoint secp256k1_ecdsa_sign_inner_sdv_static_function_1 locally {
+Running entrypoint secp256k1_context_create }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_negate locally {
+Running entrypoint secp256k1_ec_pubkey_negate }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_privkey_tweak_mul locally {
+Running entrypoint secp256k1_ec_privkey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_tweak_mul locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_add }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ecdsa_sign locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_add_helper_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_seckey_verify locally {
+Running entrypoint secp256k1_ec_seckey_verify }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_ec_pubkey_create locally {
+Running entrypoint secp256k1_ec_pubkey_tweak_mul }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint secp256k1_context_randomize locally {
+Running entrypoint secp256k1_ec_pubkey_create }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint ArvCalculateCharCountWithinUnicodeString locally {
+Running entrypoint secp256k1_context_randomize }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint ArvFindSubString locally {
+Running entrypoint ArvCalculateCharCountWithinUnicodeString }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint ArvFindSubString }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint ArvFreeRegProcs }
+[TAG: AV_DEBUG] Bugs found so far: 9
+Running entrypoint MiniMessage }
+[TAG: AV_DEBUG] Bugs found so far: 14
+FastAvn deadline reached; consolidating results
+Stopping approximately 3 instances of AV
+Running entrypoint secp256k1_ec_pubkey_create_helper_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 14
+Running entrypoint secp256k1_ecdsa_sign_inner_sdv_static_function_1 }
+[TAG: AV_DEBUG] Bugs found so far: 14
+Running entrypoint secp256k1_ecdsa_sign }
+[TAG: AV_DEBUG] Bugs found so far: 14
+[TAG: AV_OUTPUT] ========= Merged Bugs for 58 Entry Points =========
+[TAG: AV_OUTPUT] Description,Src File,Line,Procedure,Fail Status
+[TAG: AV_OUTPUT] Bug: Assertion !(pPathEntry_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,29,ArvAddRule,notmustFail,2 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pRuleEntry_5 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,14,ArvAddRule,notmustFail,0 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pRuleEntry2 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,243,ArvAddRuleEntry2,notmustFail,0 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(Tmp_580 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,32,ArvAddRule,notmustFail,2 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(Tmp_580 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,32,ArvAddRule,notmustFail,3 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pPathEntry_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,29,ArvAddRule,notmustFail,1 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(Tmp_582 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,19,ArvAddRule,notmustFail,4 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pRuleEntry_5 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,14,ArvAddRule,notmustFail,1 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pRegProcEntry_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,310,ArvAddRegProc,notmustFail,0 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(Tmp_582 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,19,ArvAddRule,notmustFail,3 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pRegProcEntry_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,310,ArvAddRegProc,notmustFail,5 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(Mem_T.Buffer__STRING[Buffer__STRING(sidString)] == NULL) failed,d:\vsprojects\arvkit\arvfilter\init.c,333,ProcAllowed2,notmustFail,0 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pProcEntry_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,222,ArvAddProc,notmustFail,0 Count: 1
+[TAG: AV_OUTPUT] Bug: Assertion !(pflag_1 == NULL) failed,d:\vsprojects\arvkit\arvfilter\config.c,375,ArvProcessFlagAdd,notmustFail,0 Count: 3
+[TAG: AV_STATS] *************** STATS ***************
+[TAG: AV_STATS] fastavn(s) : 2840.9851926
+[TAG: AV_STATS] impl.count : 238
+[TAG: AV_STATS] #EntryPoints : 58
+[TAG: AV_STATS] #Bugs : 9
+[TAG: AV_STATS] *************************************
+
+EngineQ: 9 bugs found
+EngineQ deadline reached
+Done

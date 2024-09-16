@@ -1,0 +1,4 @@
+Driver is entered:
+[config.c@373]            ArvProcessFlagAdd calls ExEnterCriticalRegionAndAcquireResourceExclusive
+[config.c@374]            ArvProcessFlagAdd calls ExAllocatePoolWithTag
+Error 

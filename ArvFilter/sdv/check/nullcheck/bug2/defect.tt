@@ -1,0 +1,20 @@
+0 "?" 0 false ^ Call "OS" "main"
+1 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+2 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+3 "d:\vsprojects\arvkit\arvfilter\config.c" 12 true ^arg1=0^arg2=56^arg3=5393477_sdvRelevantTraceLine_^====Auto===== Call "ArvAddRule" "ExAllocatePoolWithTag"
+4 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+5 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+6 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7366 true ^PoolType=0_sdvRelevantTraceLine_^====Auto===== Atomic Conditional
+7 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7369 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+8 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7375 true _sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+9 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+10 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 7377 true _sdvIrrelevantTraceLine_^====Auto===== Return
+11 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+12 "d:\vsprojects\arvkit\arvfilter\config.c" 12 true ^sdv=0_sdvRelevantTraceLine_^====Auto===== Atomic Assignment
+13 "d:\vsprojects\arvkit\arvfilter\config.c" 13 true ^arg1=0^arg2=56_sdvIrrelevantTraceLine_^====Auto===== Call "ArvAddRule" "sdv_RtlZeroMemory"
+14 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+15 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+16 "d:\vsprojects\arvkit\arvfilter\sdv\sdv-harness.c" 15966 true _sdvIrrelevantTraceLine_^====Auto===== Return
+17 "?" 0 true _sdvIrrelevantTraceLine_^====Auto===== Atomic Continuation
+18 "d:\vsprojects\arvkit\arvfilter\config.c" 14 true ^id=382_sdvRelevantTraceLine__sdvNotMustFailLocation_^====Auto===== Atomic Assignment
+Error 
