@@ -857,7 +857,8 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 	if (((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_DATA) != 0) ||
 		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_ATTRIBUTES) != 0) ||
 		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_WRITE_EA) != 0) ||
-		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_APPEND_DATA) != 0))
+		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & FILE_APPEND_DATA) != 0) ||
+		((Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess & DELETE) != 0))
 	{
 		createDisposition = 0;
 	}
@@ -975,7 +976,6 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 			}
 		}
 
-
 		//UNICODE_STRING tests = { 0 };
 		//RtlInitUnicodeString(&tests, L"C:\\aaa.txt");
 		//if (strcmp(callerProcessName, "encrypt_decryp") == 0)// && RtlEqualUnicodeString(&fullPath, &tests, TRUE))
@@ -1059,7 +1059,7 @@ FLT_PREOP_CALLBACK_STATUS FLTAPI PreOperationCreate(
 		//}
 
 		//TODO: 检查后缀是否是exe bat
-		if (flag && createDisposition==1 && pPathEntry && pPathEntry->blockExe)
+		if (flag && createDisposition==0 && pPathEntry && pPathEntry->blockExe)
 		{
 			UNICODE_STRING extensionExe = { 0 };
 			UNICODE_STRING extensionBat = { 0 };
